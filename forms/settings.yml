@@ -1,0 +1,45 @@
+sections:
+  - key: fx
+    label: Feature Experimentation
+    elements:
+      - type: secret
+        key: apiToken
+        label: Personal access token
+        help: >-
+          FX app → Profile → API Access → Generate new token. Needs write access to
+          the project's flags and events. Leave blank to keep the saved one.
+      - type: text
+        key: projectId
+        label: Project ID
+        help: The FX project whose SDK key the site runs (optimizely-nextjs-demo uses 23385830076).
+      - type: text
+        key: environmentKey
+        label: Environment key
+        help: Environment the A/B rule is created in. Defaults to production.
+      - type: text
+        key: audienceIds
+        label: Default audience IDs (optional)
+        help: >-
+          Comma-separated audience IDs applied to every new rule. In project 23385830076,
+          5418466184790016 is the "Personal - CMS" hostname audience the live experiments use.
+      - type: button
+        label: Save
+        action: saveFx
+        style: primary
+  - key: cms
+    label: CMS API client
+    elements:
+      - type: text
+        key: clientId
+        label: Client ID
+        help: >-
+          CMS → Settings → API Keys. Used to read this item's versions so the
+          extension can see its variations.
+      - type: secret
+        key: clientSecret
+        label: Client secret
+        help: Shown once when the API key is created. Leave blank to keep the saved one.
+      - type: button
+        label: Save
+        action: saveCms
+        style: primary

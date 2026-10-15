@@ -1,0 +1,30 @@
+meta:
+  app_id: fx_cms_experiments
+  display_name: FX Experiments
+  version: 0.0.1-dev.2
+  vendor: optimizely
+  summary: Turn a page's CMS variations into a Feature Experimentation A/B test from the editor.
+  support_url: https://www.optimizely.com
+  contact_email: joshua.onwezen@optimizely.com
+  categories:
+    - Testing & Utilities
+  availability:
+    - all
+
+runtime: node22-cms-ext
+
+functions:
+  cms_extension:
+    entry_point: CmsUiExtension
+    description: Backend for the FX Experiments sidebar and view (FX REST + CMS REST).
+    accepts: cms_ui_extension
+
+ui_extensions:
+  sidebar:
+    - name: fx-experiment
+      entry_point: FxExperiment
+      display_name: Experiment
+  view:
+    - name: fx-experiments
+      entry_point: FxExperiments
+      display_name: Experiments
