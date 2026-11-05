@@ -17,6 +17,18 @@ function sameRef(a: ContentRef | null, b: ContentRef | null): boolean {
   return a?.key === b?.key && a?.locale === b?.locale && a?.version === b?.version && a?.publicUrl === b?.publicUrl;
 }
 
+function errorCode(error: Error): string | null {
+  return error instanceof CallError ? error.code : null;
+}
+
+// An image or folder isn't a failure, just not something to experiment on.
+function alertIntent(error: Error): 'information' | 'warning' | 'danger' {
+  const code = errorCode(error);
+  if (code === 'unsupported_content') return 'information';
+  if (code === 'not_configured' || code === 'locale_missing') return 'warning';
+  return 'danger';
+}
+
 function FxExperiment({context}: {context: ExtensionContext}) {
   const [contentRef, setContentRef] = useState<ContentRef | null>(null);
   const [status, setStatus] = useState<StatusResult | null>(null);
@@ -95,13 +107,13 @@ function FxExperiment({context}: {context: ExtensionContext}) {
   return (
     <Box p="12">
       <Group flexDirection="column" gap="12">
-        {status && (
+        {current && status && (
           <Group alignItems="center" justifyContent="space-between">
             <Heading level="4">{status.content.displayName}</Heading>
             {loading && <Spinner size="sm" />}
           </Group>
         )}
-        {status && (
+        {current && status && (
           <Text color="fg.secondary" fontSize="sm">
             {editing ? (
               <>
@@ -115,13 +127,15 @@ function FxExperiment({context}: {context: ExtensionContext}) {
 
         {!contentRef && <Text color="fg.secondary">Open a page to set up its experiment.</Text>}
         {loadError && (
-          <Alert intent={loadError instanceof CallError && loadError.code === 'not_configured' ? 'warning' : 'danger'}>
+          <Alert intent={alertIntent(loadError)}>
             <Group flexDirection="column" gap="8">
               <Text fontSize="sm">{errorMessage(loadError)}</Text>
-              {loadError instanceof CallError && loadError.code === 'not_configured' && (
+              {errorCode(loadError) === 'not_configured' && (
                 <Text fontSize="sm">Fill these in on the Feature Experimentation app&apos;s settings page.</Text>
               )}
-              <Button onClick={onRefresh} size="sm">Retry</Button>
+              {errorCode(loadError) !== 'unsupported_content' && (
+                <Button onClick={onRefresh} size="sm">Retry</Button>
+              )}
             </Group>
           </Alert>
         )}

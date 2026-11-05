@@ -55,11 +55,35 @@ interface ResolvedContent {
   publicUrl?: string;
 }
 
+/**
+ * The item's versions in `locale`. The editor reports its UI locale even for items
+ * without language versions (media, folders), and the CMS answers those with a 404, so
+ * look the item up once to say what's wrong instead of passing the raw error on.
+ */
+export async function listVersionsOrExplain(cms: CmsClient, key: string, locale: string) {
+  try {
+    return await cms.listVersions(key, locale);
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+    const item = await cms.getItem(key);
+    if (!item) throw new ActionError('content_missing', 'This item no longer exists in the CMS.');
+    const locales = (item.locales ?? []).filter(Boolean);
+    if (locales.length === 0) {
+      const what = item.contentType ? ` (${item.contentType})` : '';
+      throw new ActionError(
+        'unsupported_content',
+        `Experiments run on pages. This item${what} has no language versions, so it can't have variations.`,
+      );
+    }
+    throw new ActionError('locale_missing', `This item has no "${locale}" version. It exists in: ${locales.join(', ')}.`);
+  }
+}
+
 async function resolveContent({cms}: Deps, ref: ContentRef): Promise<ResolvedContent> {
   if (!ref?.key) throw new ActionError('missing_content', 'No content item is open.');
   const key = normalizeKey(ref.key);
   const locale = ref.locale || (await cms.primaryLocale(key));
-  const versions = await cms.listVersions(key, locale);
+  const versions = await listVersionsOrExplain(cms, key, locale);
   const {variations, displayName} = summarizeVersions(versions);
 
   let currentVariation: string | null = null;

@@ -23,6 +23,14 @@ export interface CmsVersion {
   variation?: string | null;
 }
 
+export interface CmsItem {
+  key: string;
+  contentType?: string;
+  primaryLocale?: string | null;
+  /** [''] for items without language versions (media, folders). */
+  locales?: string[];
+}
+
 // Module scope survives warm invocations of the function.
 let tokenCache: {clientId: string; token: string; expiresAt: number} | null = null;
 
@@ -57,9 +65,17 @@ export class CmsClient {
     });
   }
 
+  public async getItem(key: string): Promise<CmsItem | null> {
+    try {
+      return await this.get<CmsItem>('Get content', `/v1/content/${key}`);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  }
+
   public async primaryLocale(key: string): Promise<string> {
-    const item = await this.get<{primaryLocale?: string}>('Get content', `/v1/content/${key}`);
-    return item?.primaryLocale ?? 'en';
+    return (await this.getItem(key))?.primaryLocale || 'en';
   }
 
   /** Every version of the item in `locale`, newest first (capped at MAX_PAGES pages). */

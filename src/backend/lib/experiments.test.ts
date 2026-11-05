@@ -1,7 +1,8 @@
 import {describe, expect, it} from 'vitest';
 
-import {summarizeVersions} from './cms';
-import {diffVariations} from './experiments';
+import {CmsClient, CmsItem, summarizeVersions} from './cms';
+import {diffVariations, listVersionsOrExplain} from './experiments';
+import {ApiError} from './http';
 import {FxFlagListItem, runningCmsExperiments} from './fx';
 
 describe('summarizeVersions', () => {
@@ -105,5 +106,35 @@ describe('runningCmsExperiments', () => {
         url,
       ),
     ).toEqual([]);
+  });
+});
+
+describe('listVersionsOrExplain', () => {
+  const notFound = new ApiError(404, 'cms_not_found', "List versions: HTTP 404 Unable to find content item");
+  const cmsWith = (item: CmsItem | null) =>
+    ({
+      listVersions: () => Promise.reject(notFound),
+      getItem: () => Promise.resolve(item),
+    }) as unknown as CmsClient;
+
+  it('says media items cannot have variations', async () => {
+    // GET /v1/content/{key} for an image on joshCMS: no language versions.
+    const image = {key: '64c52fe72b1d48b98ced7122189e986b', contentType: 'ImageMedia', locales: ['']};
+    await expect(listVersionsOrExplain(cmsWith(image), image.key, 'en')).rejects.toMatchObject({
+      code: 'unsupported_content',
+      message: expect.stringContaining('ImageMedia'),
+    });
+  });
+
+  it('names the locales a page does exist in', async () => {
+    const page = {key: 'k', contentType: 'ArticlePage', locales: ['nl', 'sv']};
+    await expect(listVersionsOrExplain(cmsWith(page), 'k', 'en')).rejects.toMatchObject({
+      code: 'locale_missing',
+      message: expect.stringContaining('nl, sv'),
+    });
+  });
+
+  it('reports a deleted item', async () => {
+    await expect(listVersionsOrExplain(cmsWith(null), 'k', 'en')).rejects.toMatchObject({code: 'content_missing'});
   });
 });
