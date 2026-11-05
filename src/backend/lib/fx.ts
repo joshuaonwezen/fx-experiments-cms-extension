@@ -6,7 +6,7 @@ import {
   FX_APP_BASE,
 } from '../../shared/constants';
 import {splitTraffic} from '../../shared/experiment';
-import type {FxEvent, RuleSummary} from '../../shared/types';
+import type {FxEvent, RuleSummary, RunningExperiment} from '../../shared/types';
 import {ApiError, requestJson} from './http';
 
 const FLAGS_API = 'https://api.optimizely.com/flags/v1';
@@ -31,6 +31,17 @@ export interface FxFlag {
   description?: string;
   archived?: boolean;
   variable_definitions?: Record<string, FxVariableDefinition>;
+}
+
+/** A flag as the list endpoint returns it: variables plus a rule summary per environment. */
+export interface FxFlagListItem extends FxFlag {
+  environments?: Record<
+    string,
+    {
+      enabled?: boolean;
+      rules_detail?: Array<{key: string; name?: string; type: string; enabled?: boolean; status?: string}>;
+    }
+  >;
 }
 
 export interface FxVariation {
@@ -70,6 +81,7 @@ export interface FxRuleset {
 
 interface Page<T> {
   items?: T[];
+  total_pages?: number;
 }
 
 type PatchOp = {op: 'add' | 'replace' | 'remove'; path: string; value?: unknown};
@@ -121,6 +133,21 @@ export class FxClient {
   public async listEnvironments(): Promise<string[]> {
     const page = await this.request<Page<{key: string}>>('List environments', `${this.flagsBase}/environments`);
     return (page?.items ?? []).map((e) => e.key);
+  }
+
+  /** Every active flag in the project, in one request per 100 flags. */
+  public async listFlags(): Promise<FxFlagListItem[]> {
+    const flags: FxFlagListItem[] = [];
+    // The Flags API pages with page_window; it rejects `page` with a 400.
+    for (let page = 1; page <= 10; page++) {
+      const batch = await this.request<Page<FxFlagListItem>>(
+        'List flags',
+        `${this.flagsBase}/flags?per_page=100&page_window=${page}&archived=false`,
+      );
+      flags.push(...(batch?.items ?? []).filter((f) => !f.archived));
+      if (!batch?.total_pages || page >= batch.total_pages) break;
+    }
+    return flags;
   }
 
   public async getFlag(flagKey: string): Promise<FxFlag | null> {
@@ -314,6 +341,36 @@ export function metricFor(event: FxEvent): FxMetric {
     winning_direction: 'increasing',
     display_title: event.name,
   };
+}
+
+// Rule types that split visitors to measure something; deliveries and rollouts only serve.
+const EXPERIMENT_RULE_TYPES = new Set(['a/b', 'multi_armed_bandit', 'contextual_multi_armed_bandit']);
+
+/**
+ * The experiments the site serves as CMS content right now in `environmentKey`: an
+ * enabled experiment rule, in an enabled environment, on a flag whose cms_flag default
+ * is true (the site's middleware ignores flags without it).
+ */
+export function runningCmsExperiments(
+  flags: FxFlagListItem[],
+  environmentKey: string,
+  flagUrl: (flagKey: string) => string,
+): RunningExperiment[] {
+  return flags.flatMap((flag) => {
+    const env = flag.environments?.[environmentKey];
+    const cmsFlag = flag.variable_definitions?.[CMS_FLAG_VARIABLE]?.default_value;
+    if (flag.archived || !env?.enabled || String(cmsFlag).toLowerCase() !== 'true') return [];
+    return (env.rules_detail ?? [])
+      .filter((rule) => EXPERIMENT_RULE_TYPES.has(rule.type) && rule.enabled)
+      .map((rule) => ({
+        flagKey: flag.key,
+        flagName: flag.name,
+        ruleKey: rule.key,
+        ruleName: rule.name || rule.key,
+        route: flag.variable_definitions?.[CMS_ROUTE_VARIABLE]?.default_value ?? '',
+        flagUrl: flagUrl(flag.key),
+      }));
+  });
 }
 
 /** The UI-facing view of one rule. */

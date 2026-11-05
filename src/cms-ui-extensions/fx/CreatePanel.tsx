@@ -6,6 +6,7 @@ import {useEffect, useState} from 'react';
 import {call, errorMessage} from '../common/api';
 import {MetricPicker} from '../common/MetricPicker';
 import {formatPercent} from '../common/StatusBadge';
+import {clashesFor, RunningExperimentsAlert} from './RunningExperimentsAlert';
 import type {PanelProps} from './types';
 
 export function CreatePanel(props: PanelProps) {
@@ -48,6 +49,7 @@ export function CreatePanel(props: PanelProps) {
   const trafficError = trafficN >= 1 && trafficN <= 100 ? null : 'Between 1 and 100.';
   const canSubmit = !flagError && !routeError && !trafficError && chosen.length > 0 && !busy;
   const arms = splitTraffic(experimentKeys(chosen));
+  const clashes = routeError ? [] : clashesFor(status.runningExperiments, route);
 
   const toggle = (name: string) =>
     setChosen((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
@@ -67,6 +69,8 @@ export function CreatePanel(props: PanelProps) {
           eventIds,
           trafficPercent: trafficN,
           start,
+          // The warning above the button is the confirmation.
+          confirmConflicts: start && clashes.length > 0,
         }),
       );
     } catch (e) {
@@ -140,13 +144,14 @@ export function CreatePanel(props: PanelProps) {
         <MetricPicker events={events} onChange={setEventIds} onCreateEvent={createEvent} selected={eventIds} />
       </Group>
 
+      <RunningExperimentsAlert bothRunning={false} clashes={clashes} running={status.runningExperiments} />
       <Switch checked={start} onCheckedChange={setStart}>
         Start the experiment now
       </Switch>
 
       {error && <Alert intent="danger">{error}</Alert>}
       <Button appearance="primary" disabled={!canSubmit} loading={busy} onClick={() => void submit()}>
-        Create experiment
+        {start && clashes.length > 0 ? 'Create and start anyway' : 'Create experiment'}
       </Button>
 
       <Separator />

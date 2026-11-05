@@ -58,6 +58,21 @@ export interface RuleSummary {
   flagUrl: string;
 }
 
+/**
+ * A running experiment on a CMS-driven flag (cms_flag on) in this environment. The site
+ * buckets a visitor into every such flag whose cms_route covers the page, but the page
+ * can only show one variation, so two on the same page muddy each other's results.
+ */
+export interface RunningExperiment {
+  flagKey: string;
+  flagName: string;
+  ruleKey: string;
+  ruleName: string;
+  /** The flag's cms_route default; '' covers every route. */
+  route: string;
+  flagUrl: string;
+}
+
 export interface VariationDiff {
   /** CMS variations the FX flag doesn't have yet. */
   missingInFx: string[];
@@ -82,6 +97,11 @@ export interface StatusResult {
   /** Set when the link points at a flag/rule FX no longer has. */
   ruleError: string | null;
   diff: VariationDiff;
+  /**
+   * Running experiments on other CMS flags (this page's own flag excluded), whatever
+   * their route; the UI filters them by the route in play. Null when FX couldn't be checked.
+   */
+  runningExperiments: RunningExperiment[] | null;
   settings: {projectId: string; environmentKey: string; audienceIds: number[]};
 }
 
@@ -95,6 +115,8 @@ export interface CreateExperimentParams {
   eventIds: number[];
   trafficPercent: number;
   start: boolean;
+  /** Start even when another experiment runs on an overlapping route. */
+  confirmConflicts?: boolean;
 }
 
 export interface ExperimentRow {
@@ -110,7 +132,7 @@ export type ActionParams = {
   createExperiment: CreateExperimentParams;
   syncVariations: {content: ContentRef; confirmRunning: boolean};
   setMetrics: {content: ContentRef; eventIds: number[]};
-  setRunning: {content: ContentRef; running: boolean};
+  setRunning: {content: ContentRef; running: boolean; confirmConflicts?: boolean};
   setRoute: {content: ContentRef; route: string};
   linkExisting: {content: ContentRef; displayName: string; flagKey: string; ruleKey?: string};
   unlink: {content: ContentRef};

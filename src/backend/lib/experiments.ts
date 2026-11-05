@@ -1,3 +1,5 @@
+import {logger} from '@zaiusinc/app-sdk';
+
 import {CMS_FLAG_VARIABLE, CONTROL_VARIATION_KEY, RESERVED_VARIATION_KEYS} from '../../shared/constants';
 import {
   defaultFlagKey,
@@ -6,6 +8,7 @@ import {
   flagKeyProblem,
   normalizeKey,
   routeProblem,
+  routesOverlap,
   variationNameProblem,
 } from '../../shared/experiment';
 import type {
@@ -16,11 +19,12 @@ import type {
   ExperimentLink,
   ExperimentRow,
   RuleSummary,
+  RunningExperiment,
   StatusResult,
   VariationDiff,
 } from '../../shared/types';
 import {CmsClient, summarizeVersions} from './cms';
-import {FxClient, FxFlag, FxRule, FxRuleset, metricFor, summarizeRule} from './fx';
+import {FxClient, FxFlag, FxRule, FxRuleset, metricFor, runningCmsExperiments, summarizeRule} from './fx';
 import {ApiError} from './http';
 import {getLink, listLinks, removeLink, saveLink} from './links';
 
@@ -105,9 +109,40 @@ export function diffVariations(cmsVariations: CmsVariation[], ruleVariationKeys:
   };
 }
 
+/** Running CMS experiments in `fx`'s environment, other than those on `ownFlagKey`. */
+async function runningExperiments(fx: FxClient, ownFlagKey?: string): Promise<RunningExperiment[]> {
+  const flags = await fx.listFlags();
+  return runningCmsExperiments(flags, fx.environmentKey, (key) => fx.flagUrl(key)).filter(
+    (e) => e.flagKey !== ownFlagKey,
+  );
+}
+
+/**
+ * Refuses to start `flagKey` on `route` while another CMS experiment runs on an
+ * overlapping route, unless the editor confirmed. Rules inside one flag don't clash:
+ * FX gives a visitor one rule per flag.
+ */
+async function assertNoRunningClash(fx: FxClient, flagKey: string, route: string, confirmed?: boolean) {
+  if (confirmed) return;
+  const clashes = (await runningExperiments(fx, flagKey)).filter((e) => routesOverlap(e.route, route));
+  if (clashes.length === 0) return;
+  const names = clashes.map((e) => `${e.flagKey} / ${e.ruleKey} (${e.route || 'every route'})`).join(', ');
+  throw new ActionError(
+    'experiment_running',
+    `Already running on this route: ${names}. Visitors would land in both, but the page shows one variation, ` +
+      'so both results get muddied. Pause it first, or start anyway.',
+  );
+}
+
 export async function getStatus(deps: Deps, ref: ContentRef): Promise<StatusResult> {
   const content = await resolveContent(deps, ref);
   const link = await getLink(content.key, content.locale);
+  // Informational: a failed lookup shouldn't take the whole panel down.
+  const envFx = deps.fx.forEnvironment(link?.environmentKey ?? deps.fx.environmentKey);
+  const running = runningExperiments(envFx, link?.flagKey).catch((error: unknown) => {
+    logger.warn('Running-experiment check failed', error);
+    return null;
+  });
 
   let rule: RuleSummary | null = null;
   let ruleError: string | null = null;
@@ -135,6 +170,7 @@ export async function getStatus(deps: Deps, ref: ContentRef): Promise<StatusResu
     rule,
     ruleError,
     diff: diffVariations(content.variations, rule ? rule.variations.map((v) => v.key) : []),
+    runningExperiments: await running,
     settings: {
       projectId: fxCfg.projectId,
       environmentKey: fxCfg.environmentKey,
@@ -178,8 +214,10 @@ export async function createExperiment(deps: Deps, p: CreateExperimentParams): P
     if (problem) throw new ActionError('invalid_variation', `${name}: ${problem}`);
     if (!cmsNames.has(name)) throw new ActionError('unknown_variation', `"${name}" isn't a variation of this page.`);
   }
-  const metrics = await eventMetrics(deps, p.eventIds ?? []);
   const route = p.route.trim();
+  // Before anything is created, so a refusal leaves FX untouched.
+  if (p.start) await assertNoRunningClash(fx, p.flagKey, route, p.confirmConflicts);
+  const metrics = await eventMetrics(deps, p.eventIds ?? []);
 
   // Each step checks before it creates, so a retry after a partial failure (timeout,
   // 429, validation error halfway) picks up where the last attempt stopped.
@@ -267,8 +305,13 @@ export async function setMetrics(deps: Deps, {content, eventIds}: ActionParams['
   return getStatus(deps, content);
 }
 
-export async function setRunning(deps: Deps, {content, running}: ActionParams['setRunning']): Promise<StatusResult> {
-  const {link, fx} = await requireLinked(deps, content);
+export async function setRunning(
+  deps: Deps,
+  {content, running, confirmConflicts}: ActionParams['setRunning'],
+): Promise<StatusResult> {
+  const {link, rule, fx} = await requireLinked(deps, content);
+  // rule.route is the flag's cms_route; '' means the flag applies to every route.
+  if (running) await assertNoRunningClash(fx, link.flagKey, rule.route, confirmConflicts);
   await fx.setRuleRunning(link.flagKey, link.ruleKey, Boolean(running));
   return getStatus(deps, content);
 }

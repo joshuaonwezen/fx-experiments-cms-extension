@@ -54,6 +54,47 @@ export function routeProblem(route: string): string | null {
   return null;
 }
 
+/** One cms_route entry, the way the site's routeMatches() reads it. */
+type RouteEntry = {kind: 'all'} | {kind: 'exact'; path: string} | {kind: 'prefix'; path: string};
+
+function routeEntries(route: string): RouteEntry[] {
+  // An absent or empty cms_route matches every route.
+  if (!route.trim()) return [{kind: 'all'}];
+  const strip = (p: string) => p.replace(/\/$/, '') || '/';
+  return route
+    .split(',')
+    .map((raw) => raw.trim())
+    .filter(Boolean)
+    .map((entry): RouteEntry => {
+      if (entry === '/*') return {kind: 'all'};
+      if (entry.endsWith('/*')) return {kind: 'prefix', path: strip(entry.slice(0, -2))};
+      return {kind: 'exact', path: strip(entry)};
+    });
+}
+
+function underPrefix(path: string, prefix: string): boolean {
+  return prefix === '/' || path === prefix || path.startsWith(`${prefix}/`);
+}
+
+function entriesOverlap(a: RouteEntry, b: RouteEntry): boolean {
+  if (a.kind === 'all' || b.kind === 'all') return true;
+  if (a.kind === 'exact' && b.kind === 'exact') return a.path === b.path;
+  if (a.kind === 'exact') return underPrefix(a.path, b.path);
+  if (b.kind === 'exact') return underPrefix(b.path, a.path);
+  return underPrefix(a.path, b.path) || underPrefix(b.path, a.path);
+}
+
+/**
+ * Whether some path is covered by both cms_route values, i.e. the site would put a
+ * visitor into both flags on the same page. Uses the matching rules of routeMatches()
+ * in the site's middleware.
+ */
+export function routesOverlap(a: string, b: string): boolean {
+  const left = routeEntries(a);
+  const right = routeEntries(b);
+  return left.some((x) => right.some((y) => entriesOverlap(x, y)));
+}
+
 /** `cms_` + a snake_case slug of the page name, trimmed to a valid key. */
 export function defaultFlagKey(displayName: string | undefined, fallback: string): string {
   const slug = (displayName ?? '')

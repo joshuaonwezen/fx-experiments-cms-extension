@@ -22,6 +22,7 @@ import {call, CallError, errorMessage} from '../common/api';
 import {MetricPicker} from '../common/MetricPicker';
 import {OpenLink} from '../common/OpenLink';
 import {formatPercent, StatusBadge} from '../common/StatusBadge';
+import {clashesFor, RunningExperimentsAlert} from './RunningExperimentsAlert';
 import type {PanelProps} from './types';
 
 type StatusAction = Exclude<ActionName, 'listEvents' | 'createEvent' | 'listExperiments'>;
@@ -87,6 +88,8 @@ export function LinkedPanel(props: PanelProps) {
   const editing = status.content.currentVariation;
   const routeError = routeProblem(routeDraft);
   const metricsDirty = metricIds.join(',') !== metricsKey;
+  // rule.route is the flag's cms_route; '' means it applies to every route.
+  const clashes = clashesFor(status.runningExperiments, rule.route);
 
   return (
     <Group flexDirection="column" gap="12">
@@ -101,13 +104,21 @@ export function LinkedPanel(props: PanelProps) {
         <code>{rule.route || 'every route'}</code>
       </Text>
 
+      <RunningExperimentsAlert bothRunning={rule.running} clashes={clashes} running={status.runningExperiments} />
       <Group flexDirection="column" gap="8">
         <Button
           appearance={rule.running ? 'default' : 'primary'}
           loading={busy === 'setRunning'}
-          onClick={() => void run('setRunning', {content: contentRef, running: !rule.running})}
+          onClick={() =>
+            void run('setRunning', {
+              content: contentRef,
+              running: !rule.running,
+              // The warning above the button is the confirmation.
+              confirmConflicts: !rule.running && clashes.length > 0,
+            })
+          }
         >
-          {rule.running ? 'Pause experiment' : 'Start experiment'}
+          {rule.running ? 'Pause experiment' : clashes.length > 0 ? 'Start anyway' : 'Start experiment'}
         </Button>
         {rule.resultsUrl ? (
           <OpenLink appearance="default" url={rule.resultsUrl}>View results</OpenLink>

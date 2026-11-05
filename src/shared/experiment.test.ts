@@ -8,6 +8,7 @@ import {
   normalizeKey,
   parseAudienceIds,
   routeProblem,
+  routesOverlap,
   splitTraffic,
   variationNameProblem,
 } from './experiment';
@@ -102,5 +103,31 @@ describe('defaults', () => {
 
   it('normalizes content keys with or without dashes', () => {
     expect(normalizeKey('3525E155-2b6f-4615-8be2-850ff6e6fb74')).toBe('3525e1552b6f46158be2850ff6e6fb74');
+  });
+});
+
+describe('routesOverlap', () => {
+  it('matches exact routes, ignoring a trailing slash', () => {
+    expect(routesOverlap('/savings', '/savings/')).toBe(true);
+    expect(routesOverlap('/savings', '/mortgages')).toBe(false);
+    expect(routesOverlap('/', '/savings')).toBe(false);
+  });
+
+  it('treats an empty route and /* as every route', () => {
+    expect(routesOverlap('', '/savings')).toBe(true);
+    expect(routesOverlap('/*', '/anything/deep')).toBe(true);
+  });
+
+  it('matches prefixes against exact routes and other prefixes', () => {
+    expect(routesOverlap('/products/*', '/products')).toBe(true);
+    expect(routesOverlap('/products/*', '/products/loans')).toBe(true);
+    expect(routesOverlap('/products/*', '/productsx')).toBe(false);
+    expect(routesOverlap('/products/*', '/products/loans/*')).toBe(true);
+    expect(routesOverlap('/products/*', '/savings/*')).toBe(false);
+  });
+
+  it('overlaps when any comma-separated entry does', () => {
+    expect(routesOverlap('/a, /b', '/c, /b')).toBe(true);
+    expect(routesOverlap('/a, /b', '/c')).toBe(false);
   });
 });
