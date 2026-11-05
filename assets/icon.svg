@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <title>FX Experiments</title>
+  <title>Feature Experimentation</title>
   <!-- Optimizely brand palette: dark green tile, lime + mint marks, extruded shadow like the wordmark -->
   <rect width="64" height="64" rx="14" fill="#0E3A29"/>
   <g fill="#051F15">

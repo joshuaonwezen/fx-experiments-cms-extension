@@ -32,8 +32,10 @@ export function CreatePanel(props: PanelProps) {
     return (
       <Group flexDirection="column" gap="8">
         <Alert intent="information">
-          This page has no variations yet. Add one from the editor&apos;s Variations dropdown and name it
-          exactly as the FX variation key you want (for example <code>business</code>). Then refresh.
+          <Text fontSize="sm">
+            This page has no variations yet. Add one from the editor&apos;s Variations dropdown and name it
+            exactly as the FX variation key you want (for example <code>business</code>). Then refresh.
+          </Text>
         </Alert>
         <Button onClick={onRefresh}>Refresh</Button>
       </Group>

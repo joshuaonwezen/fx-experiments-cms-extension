@@ -95,10 +95,12 @@ function FxExperiment({context}: {context: ExtensionContext}) {
   return (
     <Box p="12">
       <Group flexDirection="column" gap="12">
-        <Group alignItems="center" justifyContent="space-between">
-          <Heading level="4">{status?.content.displayName ?? 'Experiment'}</Heading>
-          {loading && status && <Spinner size="sm" />}
-        </Group>
+        {status && (
+          <Group alignItems="center" justifyContent="space-between">
+            <Heading level="4">{status.content.displayName}</Heading>
+            {loading && <Spinner size="sm" />}
+          </Group>
+        )}
         {status && (
           <Text color="fg.secondary" fontSize="sm">
             {editing ? (
@@ -117,7 +119,7 @@ function FxExperiment({context}: {context: ExtensionContext}) {
             <Group flexDirection="column" gap="8">
               <Text fontSize="sm">{errorMessage(loadError)}</Text>
               {loadError instanceof CallError && loadError.code === 'not_configured' && (
-                <Text fontSize="sm">Fill these in on the FX Experiments app&apos;s settings page.</Text>
+                <Text fontSize="sm">Fill these in on the Feature Experimentation app&apos;s settings page.</Text>
               )}
               <Button onClick={onRefresh} size="sm">Retry</Button>
             </Group>

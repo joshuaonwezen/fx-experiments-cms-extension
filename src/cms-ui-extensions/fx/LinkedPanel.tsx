@@ -193,9 +193,11 @@ export function LinkedPanel(props: PanelProps) {
       )}
       {diff.missingInCms.length > 0 && (
         <Alert intent="warning">
-          Create {diff.missingInCms.length === 1 ? 'a variation' : 'variations'} named exactly{' '}
-          {diff.missingInCms.map((n) => `"${n}"`).join(', ')} in the Variations dropdown. Until then, visitors bucketed
-          there see the original page.
+          <Text fontSize="sm">
+            Create {diff.missingInCms.length === 1 ? 'a variation' : 'variations'} named exactly{' '}
+            {diff.missingInCms.map((n) => `"${n}"`).join(', ')} in the Variations dropdown. Until then, visitors
+            bucketed there see the original page.
+          </Text>
         </Alert>
       )}
       {diff.invalid.map((i) => (

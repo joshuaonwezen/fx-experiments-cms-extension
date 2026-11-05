@@ -1,4 +1,4 @@
-# FX Experiments: CMS UI extension
+# Feature Experimentation: CMS UI extension
 
 An Optimizely CMS (SaaS) UI extension, built as a CMS-scoped OCP app, that turns a page's CMS variations into a Feature Experimentation A/B test from inside the editor.
 

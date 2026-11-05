@@ -64,8 +64,10 @@ function FxExperiments({context}: {context: ExtensionContext}) {
         {!rows && !error && <Spinner />}
         {rows && rows.length === 0 && (
           <Alert intent="information">
-            No experiments yet. Open a page that has variations and use the Experiment panel in the editor
-            sidebar to create one.
+            <Text fontSize="sm">
+              No experiments yet. Open a page that has variations and use the Feature Experimentation panel in the editor
+              sidebar to create one.
+            </Text>
           </Alert>
         )}
 

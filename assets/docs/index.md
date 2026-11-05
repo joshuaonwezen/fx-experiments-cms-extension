@@ -1,4 +1,4 @@
-# FX Experiments
+# Feature Experimentation
 
 ## Setup
 

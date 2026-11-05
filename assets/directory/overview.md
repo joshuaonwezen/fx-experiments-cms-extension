@@ -1,4 +1,4 @@
-# FX Experiments
+# Feature Experimentation
 
 Turn a page's CMS variations into a Feature Experimentation A/B test without leaving the editor.
 

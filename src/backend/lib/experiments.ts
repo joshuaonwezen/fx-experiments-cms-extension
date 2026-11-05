@@ -144,7 +144,7 @@ export async function getStatus(deps: Deps, ref: ContentRef): Promise<StatusResu
 }
 
 function flagDescription(contentKey: string, locale: string, route: string): string {
-  return `Created by the FX Experiments CMS extension for content ${contentKey} (${locale}), route ${route}.`;
+  return `Created by the Feature Experimentation CMS extension for content ${contentKey} (${locale}), route ${route}.`;
 }
 
 async function eventMetrics({fx}: Deps, eventIds: number[]) {
