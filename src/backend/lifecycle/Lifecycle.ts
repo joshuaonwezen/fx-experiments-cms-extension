@@ -13,7 +13,7 @@ import {
 import {CmsClient} from '../lib/cms';
 import {FxClient} from '../lib/fx';
 import {ApiError} from '../lib/http';
-import {CmsSettings, DEFAULT_ENVIRONMENT, FxSettings, toFxConfig} from '../lib/settings';
+import {CmsSettings, DEFAULT_ENVIRONMENT, FxSettings, readSection, toFxConfig} from '../lib/settings';
 
 function text(formData: SubmittedFormData, key: string): string {
   const value = formData[key];
@@ -63,7 +63,7 @@ export class Lifecycle extends AppLifecycle {
   }
 
   private async saveFx(formData: SubmittedFormData, result: LifecycleSettingsResult) {
-    const previous = await storage.settings.get<FxSettings>('fx');
+    const previous = await readSection<FxSettings>('fx');
     const next: FxSettings = {
       // A secret field comes back blank when the editor didn't retype it - keep the stored one.
       apiToken: text(formData, 'apiToken') || previous.apiToken || '',
@@ -96,7 +96,7 @@ export class Lifecycle extends AppLifecycle {
   }
 
   private async saveCms(formData: SubmittedFormData, result: LifecycleSettingsResult) {
-    const previous = await storage.settings.get<CmsSettings>('cms');
+    const previous = await readSection<CmsSettings>('cms');
     const next: CmsSettings = {
       clientId: text(formData, 'clientId'),
       clientSecret: text(formData, 'clientSecret') || previous.clientSecret || '',

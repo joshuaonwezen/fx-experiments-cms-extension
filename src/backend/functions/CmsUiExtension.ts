@@ -58,12 +58,12 @@ export class CmsUiExtension extends App.Function {
     const handler = HANDLERS[action as ActionName];
     if (!handler) return new App.Response(400, fail('unknown_action', action));
 
-    const config = await loadConfig();
-    if (!config.ok) {
-      return new App.Response(412, fail('not_configured', `Missing in app settings: ${config.missing.join(', ')}.`));
-    }
-
     try {
+      const config = await loadConfig();
+      if (!config.ok) {
+        return new App.Response(412, fail('not_configured', `Missing in app settings: ${config.missing.join(', ')}.`));
+      }
+
       const deps: Deps = {fx: new FxClient(config.fx), cms: new CmsClient(config.cms)};
       return new App.Response(200, ok(await handler(deps, params)));
     } catch (error) {

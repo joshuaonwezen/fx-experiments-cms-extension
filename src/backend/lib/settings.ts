@@ -1,4 +1,4 @@
-import {storage} from '@zaiusinc/app-sdk';
+import {logger, storage, ValueHash} from '@zaiusinc/app-sdk';
 
 import {parseAudienceIds} from '../../shared/experiment';
 import type {CmsConfig} from './cms';
@@ -31,11 +31,22 @@ export function toFxConfig(s: FxSettings): FxConfig {
   };
 }
 
+/**
+ * One settings section, or {} when the store can't be read. On a CMS-scoped install that has
+ * never saved its settings, the production store throws "Failed to get value at
+ * app-data/<install>/settings" instead of returning {}.
+ */
+export async function readSection<T extends ValueHash>(section: string): Promise<T> {
+  try {
+    return await storage.settings.get<T>(section);
+  } catch (error) {
+    logger.warn('Could not read settings section', section, error);
+    return {} as T;
+  }
+}
+
 export async function loadConfig(): Promise<LoadedConfig> {
-  const [fxSettings, cmsSettings] = await Promise.all([
-    storage.settings.get<FxSettings>('fx'),
-    storage.settings.get<CmsSettings>('cms'),
-  ]);
+  const [fxSettings, cmsSettings] = await Promise.all([readSection<FxSettings>('fx'), readSection<CmsSettings>('cms')]);
   const fx = toFxConfig(fxSettings);
   const cms = {clientId: cmsSettings.clientId?.trim() ?? '', clientSecret: cmsSettings.clientSecret?.trim() ?? ''};
 
