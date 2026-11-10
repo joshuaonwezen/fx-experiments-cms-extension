@@ -1,6 +1,7 @@
 import {
   Alert,
   AxiomProvider,
+  Badge,
   Box,
   Button,
   Group,
@@ -15,17 +16,29 @@ import {
   Text,
 } from '@optiaxiom/react';
 import {register, type ExtensionContext} from '@optimizely/cms-extensibility-sdk';
-import type {ExperimentRow} from '@shared/types';
+import type {CmsFlagOption, ExperimentLink, ExperimentRow} from '@shared/types';
 import {useCallback, useEffect, useState} from 'react';
 
 import {call, errorMessage} from '../common/api';
 import {OpenLink} from '../common/OpenLink';
 import {formatPercent, StatusBadge} from '../common/StatusBadge';
 
+const rowKey = (link: ExperimentLink) => `${link.contentKey}:${link.locale}`;
+
+function endedText(link: ExperimentLink): string {
+  const ended = link.conclusion!;
+  if (!ended.winner) return 'No winner';
+  if (!ended.shipVia) return 'Original page won';
+  if (ended.shipVia === 'fx') return `${ended.winner} won · served by FX`;
+  return ended.promotion === 'published' ? `${ended.winner} won · now the page` : `${ended.winner} won · awaiting approval`;
+}
+
 function FxExperiments({context}: {context: ExtensionContext}) {
   const [rows, setRows] = useState<ExperimentRow[] | null>(null);
+  const [unlinked, setUnlinked] = useState<CmsFlagOption[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busyRow, setBusyRow] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +50,11 @@ function FxExperiments({context}: {context: ExtensionContext}) {
     } finally {
       setLoading(false);
     }
+    // Secondary: flags FX has that no page links to.
+    call(context, 'listCmsFlags', {}).then(
+      (flags) => setUnlinked(flags.filter((f) => !f.linked)),
+      () => setUnlinked(null),
+    );
   }, [context]);
 
   useEffect(() => {
@@ -44,7 +62,25 @@ function FxExperiments({context}: {context: ExtensionContext}) {
     void load();
   }, [context, load]);
 
-  const running = rows?.filter((r) => r.rule?.running).length ?? 0;
+  const rowAction = async (link: ExperimentLink, action: () => Promise<unknown>) => {
+    setBusyRow(rowKey(link));
+    setError(null);
+    try {
+      await action();
+      await load();
+    } catch (e) {
+      setError(`${link.displayName}: ${errorMessage(e)}`);
+    } finally {
+      setBusyRow(null);
+    }
+  };
+
+  const setRunning = (link: ExperimentLink, running: boolean) =>
+    rowAction(link, () => call(context, 'setRunning', {content: {key: link.contentKey, locale: link.locale}, running}));
+  const forget = (link: ExperimentLink) =>
+    rowAction(link, async () => setRows(await call(context, 'forgetLink', {contentKey: link.contentKey, locale: link.locale})));
+
+  const running = rows?.filter((r) => r.rule?.running && !r.link.conclusion).length ?? 0;
 
   return (
     <Box p="24">
@@ -86,20 +122,25 @@ function FxExperiments({context}: {context: ExtensionContext}) {
             </TableHeader>
             <TableBody>
               {rows.map(({link, rule, error: rowError}) => (
-                <TableRow key={`${link.contentKey}:${link.locale}`}>
+                <TableRow key={rowKey(link)}>
                   <TableCell>
                     <Text fontSize="sm">{link.displayName}</Text>
                     <Text color="fg.tertiary" fontSize="xs">{link.locale}</Text>
                   </TableCell>
                   <TableCell>
-                    <code>{rule?.route || link.route || '—'}</code>
+                    <code>{rule?.route || link.route || '-'}</code>
                   </TableCell>
                   <TableCell>
                     <code>{link.flagKey}</code>
                     <Text color="fg.tertiary" fontSize="xs">{link.environmentKey}</Text>
                   </TableCell>
                   <TableCell>
-                    {rule ? (
+                    {link.conclusion ? (
+                      <Group flexDirection="column" gap="4">
+                        <Badge intent="information" variant="subtle">ended</Badge>
+                        <Text color="fg.secondary" fontSize="xs">{endedText(link)}</Text>
+                      </Group>
+                    ) : rule ? (
                       <StatusBadge running={rule.running} status={rule.status} />
                     ) : (
                       <Text color="fg.error" fontSize="sm">{rowError}</Text>
@@ -118,23 +159,46 @@ function FxExperiments({context}: {context: ExtensionContext}) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Text fontSize="sm">{rule?.metrics[0]?.title ?? '—'}</Text>
+                    <Text fontSize="sm">{rule?.metrics[0]?.title ?? '-'}</Text>
                     {rule && rule.metrics.length > 1 && (
                       <Text color="fg.tertiary" fontSize="xs">+{rule.metrics.length - 1} more</Text>
                     )}
                   </TableCell>
                   <TableCell>
-                    {rule && (
-                      <Group gap="8">
-                        {rule.resultsUrl && <OpenLink url={rule.resultsUrl}>Results</OpenLink>}
-                        <OpenLink appearance="subtle" url={rule.flagUrl}>Flag</OpenLink>
-                      </Group>
-                    )}
+                    <Group gap="8">
+                      {rule && !link.conclusion && (
+                        <Button
+                          loading={busyRow === rowKey(link)}
+                          onClick={() => void setRunning(link, !rule.running)}
+                          size="sm"
+                        >
+                          {rule.running ? 'Pause' : 'Start'}
+                        </Button>
+                      )}
+                      {rule?.resultsUrl && <OpenLink url={rule.resultsUrl}>Results</OpenLink>}
+                      {rule && <OpenLink appearance="subtle" url={rule.flagUrl}>Flag</OpenLink>}
+                      {!rule && rowError && (
+                        <Button appearance="subtle" loading={busyRow === rowKey(link)} onClick={() => void forget(link)} size="sm">
+                          Remove
+                        </Button>
+                      )}
+                    </Group>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+        )}
+
+        {unlinked && unlinked.length > 0 && (
+          <Group flexDirection="column" gap="8">
+            <Heading level="4">CMS flags no page links to</Heading>
+            <Text color="fg.secondary" fontSize="sm">
+              These flags can serve CMS variations but aren&apos;t linked to a page here. Link one from a page&apos;s
+              Feature Experimentation panel to manage it from the editor.
+            </Text>
+            <Text fontSize="sm">{unlinked.map((f) => f.flagKey).join(', ')}</Text>
+          </Group>
         )}
       </Group>
     </Box>

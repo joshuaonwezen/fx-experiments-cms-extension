@@ -19,9 +19,15 @@ export interface CmsVersion {
   locale: string;
   status: string;
   displayName?: string;
+  routeSegment?: string;
   /** Absent on base versions. */
   variation?: string | null;
+  /** PropertyData ({value: ...}) per property. Variation versions of an experience carry none. */
+  properties?: Record<string, unknown>;
+  composition?: Record<string, unknown>;
 }
+
+export type PublishOutcome = 'published' | 'awaiting_approval';
 
 export interface CmsItem {
   key: string;
@@ -60,8 +66,13 @@ export class CmsClient {
   }
 
   private async get<T>(label: string, path: string): Promise<T | null> {
+    return this.send<T>(label, path);
+  }
+
+  private async send<T>(label: string, path: string, init: RequestInit = {}): Promise<T | null> {
     return requestJson<T>('cms', label, `${CMS_API}${path}`, {
-      headers: {Authorization: `Bearer ${await this.token()}`},
+      ...init,
+      headers: {Authorization: `Bearer ${await this.token()}`, ...init.headers},
     });
   }
 
@@ -101,21 +112,81 @@ export class CmsClient {
       throw error;
     }
   }
+
+  /**
+   * Creates a draft of the item's base (no variation) in `locale` and returns its version.
+   * The CMS copies the composition but NOT the properties into the new draft, so the
+   * caller must patch every property it should keep.
+   */
+  public async createBaseDraft(
+    key: string,
+    locale: string,
+    carry: {displayName?: string; routeSegment?: string},
+  ): Promise<string> {
+    // displayName + routeSegment ride along so the CMS doesn't re-derive the URL from the name.
+    const created = await this.send<Partial<CmsVersion>>('Create draft', `/v1/content/${key}/versions`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({locale, ...carry}),
+    });
+    if (created?.version && !created.variation) return String(created.version);
+    // Some responses omit the version: take the newest base draft in this locale. Never
+    // the global /versions list (it mixes languages) and never a variation's draft.
+    const draft = (await this.listVersions(key, locale))
+      .filter((v) => v.status === 'draft' && !v.variation)
+      .sort((a, b) => Number(b.version) - Number(a.version))[0];
+    if (!draft) throw new ApiError(502, 'cms_unavailable', `Create draft: no base draft of ${key} in ${locale} afterwards.`);
+    return String(draft.version);
+  }
+
+  public async patchVersion(key: string, version: string, body: Record<string, unknown>): Promise<void> {
+    await this.send('Update draft', `/v1/content/${key}/versions/${encodeURIComponent(version)}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/merge-patch+json'},
+      body: JSON.stringify(body),
+    });
+  }
+
+  /** Publishes the version, or reports that an approval workflow holds it for review. */
+  public async publishVersion(key: string, version: string): Promise<PublishOutcome> {
+    try {
+      await this.send('Publish', `/v1/content/${key}/versions/${encodeURIComponent(version)}:publish`, {method: 'POST'});
+    } catch (error) {
+      // Instances with an approval workflow answer 400 "requires approval" and keep the draft.
+      if (error instanceof ApiError && error.status === 400 && /requires approval/i.test(error.message)) {
+        return 'awaiting_approval';
+      }
+      throw error;
+    }
+    const after = await this.getVersion(key, version);
+    return after?.status === 'published' ? 'published' : 'awaiting_approval';
+  }
+
+  /** Permanently deletes one version. The CMS refuses the published version and a locale's only version. */
+  public async deleteVersion(key: string, version: string): Promise<void> {
+    await this.send('Delete version', `/v1/content/${key}/versions/${encodeURIComponent(version)}`, {method: 'DELETE'});
+  }
 }
 
 const STATUS_RANK: Record<string, number> = {published: 3, draft: 2, previous: 1};
 
 /**
  * The item's named variations, each with its best status (published > draft >
- * previous), plus the base display name. Versions come newest first, so the first
- * base version seen carries the current name.
+ * previous), the base display name, and whether the base (original page) is published.
+ * Versions come newest first, so the first base version seen carries the current name.
  */
-export function summarizeVersions(versions: CmsVersion[]): {variations: CmsVariation[]; displayName: string} {
+export function summarizeVersions(versions: CmsVersion[]): {
+  variations: CmsVariation[];
+  displayName: string;
+  basePublished: boolean;
+} {
   const best = new Map<string, string>();
   let displayName = '';
+  let basePublished = false;
   for (const v of versions) {
     if (!v.variation) {
       if (!displayName && v.displayName) displayName = v.displayName;
+      if (v.status === 'published') basePublished = true;
       continue;
     }
     const current = best.get(v.variation);
@@ -124,5 +195,5 @@ export function summarizeVersions(versions: CmsVersion[]): {variations: CmsVaria
   const variations = [...best.entries()]
     .map(([name, status]) => ({name, status}))
     .sort((a, b) => a.name.localeCompare(b.name));
-  return {variations, displayName};
+  return {variations, displayName, basePublished};
 }

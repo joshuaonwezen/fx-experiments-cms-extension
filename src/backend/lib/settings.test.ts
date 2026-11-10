@@ -22,7 +22,7 @@ describe('readSection', () => {
     expect(warn).toHaveBeenCalledOnce();
     expect(await loadConfig()).toEqual({
       ok: false,
-      missing: ['FX personal access token', 'FX project ID', 'CMS client ID', 'CMS client secret'],
+      missing: ['FX personal access token', "the site's SDK key", 'CMS client ID', 'CMS client secret'],
     });
   });
 });

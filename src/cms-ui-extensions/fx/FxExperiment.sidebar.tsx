@@ -1,7 +1,7 @@
 import {Alert, AxiomProvider, Box, Button, Group, Heading, Spinner, Text} from '@optiaxiom/react';
 import {register, type ContentState, type ExtensionContext} from '@optimizely/cms-extensibility-sdk';
 import {normalizeKey} from '@shared/experiment';
-import type {ContentRef, FxEvent, StatusResult} from '@shared/types';
+import type {AudienceOption, ContentRef, FxEvent, StatusResult} from '@shared/types';
 import {useCallback, useEffect, useRef, useState} from 'react';
 
 import {call, CallError, errorMessage} from '../common/api';
@@ -35,8 +35,10 @@ function FxExperiment({context}: {context: ExtensionContext}) {
   const [loadError, setLoadError] = useState<CallError | Error | null>(null);
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<FxEvent[] | null>(null);
+  const [audiences, setAudiences] = useState<AudienceOption[] | null>(null);
   const requestId = useRef(0);
   const eventsRequested = useRef(false);
+  const audiencesRequested = useRef(false);
 
   const refresh = useCallback(
     async (ref: ContentRef) => {
@@ -84,6 +86,17 @@ function FxExperiment({context}: {context: ExtensionContext}) {
     }
   }, [context]);
 
+  const loadAudiences = useCallback(async () => {
+    if (audiencesRequested.current) return;
+    audiencesRequested.current = true;
+    try {
+      setAudiences(await call(context, 'listAudiences', {}));
+    } catch {
+      // The picker falls back to the audience IDs from the app settings.
+      setAudiences([]);
+    }
+  }, [context]);
+
   const createEvent = useCallback(
     async (key: string, name: string) => {
       const event = await call(context, 'createEvent', {key, name});
@@ -96,6 +109,23 @@ function FxExperiment({context}: {context: ExtensionContext}) {
   const onRefresh = useCallback(() => {
     if (contentRef) void refresh(contentRef);
   }, [contentRef, refresh]);
+
+  // A test that just started reaches the site with the next datafile (FX and its CDN
+  // cache it for about a minute); check again until it is there, for up to five minutes.
+  const waitingForSite = Boolean(status?.rule?.running && status.liveOnSite === false);
+  const polls = useRef(0);
+  useEffect(() => {
+    if (!waitingForSite) {
+      polls.current = 0;
+      return undefined;
+    }
+    if (polls.current >= 15) return undefined;
+    const timer = setTimeout(() => {
+      polls.current += 1;
+      onRefresh();
+    }, 20_000);
+    return () => clearTimeout(timer);
+  }, [waitingForSite, status, onRefresh]);
 
   const editing = status?.content.currentVariation;
   // Between switching items and the new status arriving, `status` still describes the
@@ -144,10 +174,12 @@ function FxExperiment({context}: {context: ExtensionContext}) {
         {contentRef && status && current && (
           status.link ? (
             <LinkedPanel
+              audiences={audiences}
               context={context}
               contentRef={contentRef}
               createEvent={createEvent}
               events={events}
+              loadAudiences={loadAudiences}
               loadEvents={loadEvents}
               onRefresh={onRefresh}
               onStatus={setStatus}
@@ -155,11 +187,13 @@ function FxExperiment({context}: {context: ExtensionContext}) {
             />
           ) : (
             <CreatePanel
+              audiences={audiences}
               context={context}
               contentRef={contentRef}
               createEvent={createEvent}
               events={events}
               key={`${status.content.key}:${status.content.locale}`}
+              loadAudiences={loadAudiences}
               loadEvents={loadEvents}
               onRefresh={onRefresh}
               onStatus={setStatus}

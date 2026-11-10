@@ -1,11 +1,6 @@
-import {
-  CMS_FLAG_VARIABLE,
-  CMS_ROUTE_VARIABLE,
-  CONTROL_VARIATION_KEY,
-  FULL_TRAFFIC,
-  FX_APP_BASE,
-} from '../../shared/constants';
-import {splitTraffic} from '../../shared/experiment';
+import {FULL_TRAFFIC, FX_APP_BASE} from '../../shared/constants';
+import type {Arm} from '../../shared/experiment';
+import type {SiteProfile} from '../../shared/profile';
 import type {FxEvent, RuleSummary, RunningExperiment} from '../../shared/types';
 import {ApiError, requestJson} from './http';
 
@@ -16,6 +11,8 @@ export interface FxConfig {
   token: string;
   projectId: string;
   environmentKey: string;
+  /** The site's SDK key; its datafile is what visitors are decided from. '' on installs saved before it existed. */
+  sdkKey: string;
   audienceIds: number[];
 }
 
@@ -68,6 +65,7 @@ export interface FxRule {
   status?: string;
   archived?: boolean;
   percentage_included: number;
+  audience_conditions?: unknown;
   metrics?: FxMetric[];
   variations: Record<string, {key: string; name: string; percentage_included: number}>;
   fetch_results_ui_url?: string;
@@ -103,6 +101,10 @@ export class FxClient {
 
   public get audienceIds(): number[] {
     return this.cfg.audienceIds;
+  }
+
+  public get sdkKey(): string {
+    return this.cfg.sdkKey;
   }
 
   /** The same client aimed at another environment - a link keeps the one it was created in. */
@@ -164,7 +166,14 @@ export class FxClient {
    * not per-variation values, so a variation someone later adds in the FX UI is still
    * picked up by the site's middleware (the existing `homepage` flag works the same way).
    */
-  public async createFlag(flagKey: string, name: string, description: string, route: string): Promise<FxFlag> {
+  public async createFlag(
+    flagKey: string,
+    name: string,
+    description: string,
+    route: string,
+    profile: SiteProfile,
+  ): Promise<FxFlag> {
+    const {markerVariable, routeVariable} = profile;
     const flag = await this.request<FxFlag>('Create flag', `${this.flagsBase}/flags`, {
       method: 'POST',
       body: JSON.stringify({
@@ -172,22 +181,30 @@ export class FxClient {
         name,
         description,
         variable_definitions: {
-          [CMS_FLAG_VARIABLE]: {key: CMS_FLAG_VARIABLE, type: 'boolean', default_value: 'true'},
-          [CMS_ROUTE_VARIABLE]: {key: CMS_ROUTE_VARIABLE, type: 'string', default_value: route},
+          [markerVariable]: {key: markerVariable, type: 'boolean', default_value: 'true'},
+          [routeVariable]: {key: routeVariable, type: 'string', default_value: route},
         },
       }),
     });
     return flag as FxFlag;
   }
 
-  /** Points the flag at a new route by replacing the cms_route default. */
-  public async setRouteDefault(flagKey: string, route: string): Promise<void> {
+  /** Points the flag at a new route by replacing the route variable's default. */
+  public async setRouteDefault(flagKey: string, routeVariable: string, route: string): Promise<void> {
     await this.request('Update flag route', `${this.flagsBase}/flags`, {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json-patch+json'},
       body: JSON.stringify([
-        {op: 'replace', path: `/${flagKey}/variable_definitions/${CMS_ROUTE_VARIABLE}/default_value`, value: route},
+        {op: 'replace', path: `/${flagKey}/variable_definitions/${routeVariable}/default_value`, value: route},
       ]),
+    });
+  }
+
+  /** Archives the flag in every environment. */
+  public async archiveFlag(flagKey: string): Promise<void> {
+    await this.request('Archive flag', `${this.flagsBase}/flags/archived`, {
+      method: 'POST',
+      body: JSON.stringify({keys: [flagKey]}),
     });
   }
 
@@ -220,16 +237,16 @@ export class FxClient {
     return ruleset ?? this.getRuleset(flagKey);
   }
 
-  /** Adds an A/B rule splitting traffic evenly over control + `variationKeys`. */
+  /** Adds an A/B rule over `arms` (weights in basis points). */
   public async addAbRule(
     flagKey: string,
     ruleKey: string,
     name: string,
-    variations: Array<{key: string; name: string}>,
+    arms: Array<Arm & {name: string}>,
     metrics: FxMetric[],
     trafficPercent: number,
+    audienceIds: number[],
   ): Promise<FxRuleset> {
-    const names = new Map(variations.map((v) => [v.key, v.name]));
     return this.patchRuleset('Add A/B rule', flagKey, [
       {
         op: 'add',
@@ -240,29 +257,36 @@ export class FxClient {
           type: 'a/b',
           distribution_mode: 'manual',
           percentage_included: toBasisPoints(trafficPercent),
-          audience_conditions: audienceConditions(this.cfg.audienceIds),
+          audience_conditions: audienceConditions(audienceIds),
           metrics,
-          variations: ruleVariations(variations.map((v) => v.key), names),
+          variations: ruleVariations(arms),
         },
       },
     ]);
   }
 
-  /** Re-splits the rule evenly over control + `variationKeys` (adds any new ones). */
-  public async setRuleVariations(
-    flagKey: string,
-    ruleKey: string,
-    variations: Array<{key: string; name: string}>,
-  ): Promise<FxRuleset> {
-    const names = new Map(variations.map((v) => [v.key, v.name]));
+  /** Replaces the rule's arms and their weights. */
+  public async setRuleArms(flagKey: string, ruleKey: string, arms: Array<Arm & {name: string}>): Promise<FxRuleset> {
     return this.patchRuleset('Update rule variations', flagKey, [
-      {op: 'replace', path: `/rules/${ruleKey}/variations`, value: ruleVariations(variations.map((v) => v.key), names)},
+      {op: 'replace', path: `/rules/${ruleKey}/variations`, value: ruleVariations(arms)},
     ]);
   }
 
   public async setRuleMetrics(flagKey: string, ruleKey: string, metrics: FxMetric[]): Promise<FxRuleset> {
     return this.patchRuleset('Update rule metrics', flagKey, [
       {op: 'replace', path: `/rules/${ruleKey}/metrics`, value: metrics},
+    ]);
+  }
+
+  public async setRuleTraffic(flagKey: string, ruleKey: string, trafficPercent: number): Promise<FxRuleset> {
+    return this.patchRuleset('Update rule traffic', flagKey, [
+      {op: 'replace', path: `/rules/${ruleKey}/percentage_included`, value: toBasisPoints(trafficPercent)},
+    ]);
+  }
+
+  public async setRuleAudiences(flagKey: string, ruleKey: string, audienceIds: number[]): Promise<FxRuleset> {
+    return this.patchRuleset('Update rule audiences', flagKey, [
+      {op: 'replace', path: `/rules/${ruleKey}/audience_conditions`, value: audienceConditions(audienceIds)},
     ]);
   }
 
@@ -279,6 +303,33 @@ export class FxClient {
       ruleset = await this.getRuleset(flagKey);
     }
     return ruleset;
+  }
+
+  /**
+   * Adds a targeted delivery that serves one variation to everyone in `audienceIds`
+   * (every visitor when empty). The Flags API creates rules disabled; the caller starts it.
+   */
+  public async addDeliveryRule(
+    flagKey: string,
+    ruleKey: string,
+    name: string,
+    variation: {key: string; name: string},
+    audienceIds: number[],
+  ): Promise<FxRuleset> {
+    return this.patchRuleset('Add delivery rule', flagKey, [
+      {
+        op: 'add',
+        path: `/rules/${ruleKey}`,
+        value: {
+          key: ruleKey,
+          name,
+          type: 'targeted_delivery',
+          percentage_included: FULL_TRAFFIC,
+          audience_conditions: audienceConditions(audienceIds),
+          variations: {[variation.key]: {key: variation.key, name: variation.name, percentage_included: FULL_TRAFFIC}},
+        },
+      },
+    ]);
   }
 
   /** The project's custom events, archived ones excluded. */
@@ -322,12 +373,23 @@ function audienceConditions(ids: number[]): unknown[] {
   return ids.length > 0 ? ['or', ...ids.map((id) => ({audience_id: id}))] : [];
 }
 
-function ruleVariations(keys: string[], names: Map<string, string>) {
+/** The audience ids anywhere in a rule's audience_conditions tree. */
+export function audienceIdsOf(conditions: unknown): number[] {
+  const found = new Set<number>();
+  const walk = (node: unknown) => {
+    if (Array.isArray(node)) node.forEach(walk);
+    else if (node && typeof node === 'object' && 'audience_id' in node) {
+      const id = Number((node as {audience_id: unknown}).audience_id);
+      if (Number.isSafeInteger(id) && id > 0) found.add(id);
+    }
+  };
+  walk(conditions);
+  return [...found];
+}
+
+function ruleVariations(arms: Array<Arm & {name: string}>) {
   return Object.fromEntries(
-    splitTraffic(keys).map(({key, weight}) => [
-      key,
-      {key, name: names.get(key) ?? key, percentage_included: weight},
-    ]),
+    arms.map(({key, name, weight}) => [key, {key, name, percentage_included: weight}]),
   );
 }
 
@@ -343,34 +405,63 @@ export function metricFor(event: FxEvent): FxMetric {
   };
 }
 
-// Rule types that split visitors to measure something; deliveries and rollouts only serve.
+// Rule types that split visitors to measure something.
 const EXPERIMENT_RULE_TYPES = new Set(['a/b', 'multi_armed_bandit', 'contextual_multi_armed_bandit']);
+const DELIVERY_RULE_TYPES = new Set(['targeted_delivery', 'rollout']);
 
 /**
- * The experiments the site serves as CMS content right now in `environmentKey`: an
- * enabled experiment rule, in an enabled environment, on a flag whose cms_flag default
- * is true (the site's middleware ignores flags without it).
+ * Fallback for installs without an SDK key: the live CMS rules as far as the Flags API
+ * list shows them. It sees only variable defaults, so a flag that switches the marker
+ * on per variation is missed; the datafile (liveCmsRules) has no such gap.
  */
 export function runningCmsExperiments(
   flags: FxFlagListItem[],
   environmentKey: string,
+  profile: SiteProfile,
   flagUrl: (flagKey: string) => string,
 ): RunningExperiment[] {
   return flags.flatMap((flag) => {
     const env = flag.environments?.[environmentKey];
-    const cmsFlag = flag.variable_definitions?.[CMS_FLAG_VARIABLE]?.default_value;
-    if (flag.archived || !env?.enabled || String(cmsFlag).toLowerCase() !== 'true') return [];
+    const marker = flag.variable_definitions?.[profile.markerVariable];
+    if (flag.archived || !env?.enabled || marker?.type !== 'boolean') return [];
+    if (String(marker.default_value).toLowerCase() !== 'true') return [];
     return (env.rules_detail ?? [])
-      .filter((rule) => EXPERIMENT_RULE_TYPES.has(rule.type) && rule.enabled)
+      .filter((rule) => rule.enabled && (EXPERIMENT_RULE_TYPES.has(rule.type) || DELIVERY_RULE_TYPES.has(rule.type)))
       .map((rule) => ({
         flagKey: flag.key,
         flagName: flag.name,
         ruleKey: rule.key,
         ruleName: rule.name || rule.key,
-        route: flag.variable_definitions?.[CMS_ROUTE_VARIABLE]?.default_value ?? '',
+        kind: EXPERIMENT_RULE_TYPES.has(rule.type) ? ('experiment' as const) : ('delivery' as const),
+        route: flag.variable_definitions?.[profile.routeVariable]?.default_value ?? '',
+        variations: [],
         flagUrl: flagUrl(flag.key),
       }));
   });
+}
+
+/**
+ * The route the site applies `armKeys` on: each arm's override of the route variable, or
+ * the default. A blank value anywhere means every route.
+ */
+export function effectiveRoute(
+  flag: FxFlag,
+  variations: FxVariation[],
+  armKeys: string[],
+  routeVariable: string,
+): {route: string; perVariation: boolean} {
+  const fallback = flag.variable_definitions?.[routeVariable]?.default_value ?? '';
+  let perVariation = false;
+  const routes = armKeys.map((key) => {
+    const own = variations.find((v) => v.key === key)?.variables?.[routeVariable];
+    if (own && own.is_default === false) {
+      perVariation = true;
+      return own.value.trim();
+    }
+    return fallback.trim();
+  });
+  const unique = [...new Set(routes.length > 0 ? routes : [fallback.trim()])];
+  return {route: unique.includes('') ? '' : unique.join(', '), perVariation};
 }
 
 /** The UI-facing view of one rule. */
@@ -381,6 +472,8 @@ export function summarizeRule(
   ruleset: FxRuleset,
   environmentKey: string,
   flagUrl: string,
+  profile: SiteProfile,
+  flagVariations: FxVariation[],
 ): RuleSummary {
   const variations = Object.values(rule.variations ?? {}).map((v) => ({
     key: v.key,
@@ -389,7 +482,13 @@ export function summarizeRule(
   }));
   // Control first, then by name, so the table reads baseline → challengers.
   variations.sort((a, b) =>
-    a.key === CONTROL_VARIATION_KEY ? -1 : b.key === CONTROL_VARIATION_KEY ? 1 : a.key.localeCompare(b.key),
+    a.key === profile.controlKey ? -1 : b.key === profile.controlKey ? 1 : a.key.localeCompare(b.key),
+  );
+  const {route, perVariation} = effectiveRoute(
+    flag,
+    flagVariations,
+    variations.map((v) => v.key).filter((k) => k !== 'off'),
+    profile.routeVariable,
   );
   return {
     flagKey: flag.key,
@@ -401,8 +500,15 @@ export function summarizeRule(
     trafficPercent: rule.percentage_included / (FULL_TRAFFIC / 100),
     variations,
     metrics: (rule.metrics ?? []).map((m) => ({eventId: m.event_id, title: m.display_title ?? String(m.event_id)})),
-    route: flag.variable_definitions?.[CMS_ROUTE_VARIABLE]?.default_value ?? '',
+    audienceIds: audienceIdsOf(rule.audience_conditions),
+    route,
+    routePerVariation: perVariation,
     resultsUrl: rule.fetch_results_ui_url ?? null,
     flagUrl,
   };
+}
+
+/** The rule's arms with their current weights (basis points), in rule order. */
+export function armsOf(rule: FxRule): Array<Arm & {name: string}> {
+  return Object.values(rule.variations ?? {}).map((v) => ({key: v.key, name: v.name, weight: v.percentage_included}));
 }

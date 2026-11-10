@@ -19,6 +19,8 @@ const FALLBACK_MESSAGES: Record<string, string> = {
   fx_rate_limited: 'FX is rate limiting requests. Try again in a moment.',
   internal_error: 'Something went wrong in the extension backend.',
   backend_unreachable: 'The extension backend failed before answering. The app logs (ocp app logs) have the details.',
+  cms_write_denied: 'The CMS API key in the app settings can read content but not change it.',
+  delete_disabled: 'Deleting variations is turned off. An admin can turn it on in the app settings.',
 };
 
 /** Calls one backend action; resolves with its result or throws CallError. */
