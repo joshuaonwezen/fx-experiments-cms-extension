@@ -87,7 +87,9 @@ describe.runIf(live)('FX lifecycle (live)', () => {
     console.log('re-split', JSON.stringify(ruleset.rules[RULE].variations));
     const total = Object.values(ruleset.rules[RULE].variations).reduce((s, v) => s + v.percentage_included, 0);
     expect(total).toBe(10000);
-    expect(ruleset.rules[RULE].variations[CONTROL_VARIATION_KEY].percentage_included).toBe(4000);
+    // 60/40 scaled into the 6667 left after smoke_b's even third; the rounding remainder goes to control.
+    expect(ruleset.rules[RULE].variations[CONTROL_VARIATION_KEY].percentage_included).toBe(4001);
+    expect(ruleset.rules[RULE].variations.smoke_a.percentage_included).toBe(2666);
 
     ruleset = await fx.setRuleTraffic(FLAG, RULE, 25);
     expect(ruleset.rules[RULE].percentage_included).toBe(2500);
