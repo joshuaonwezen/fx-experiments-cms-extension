@@ -18,7 +18,7 @@ const FALLBACK_MESSAGES: Record<string, string> = {
   cms_unauthorized: 'The CMS rejected the API client. Check it in the app settings.',
   fx_rate_limited: 'FX is rate limiting requests. Try again in a moment.',
   internal_error: 'Something went wrong in the extension backend.',
-  backend_unreachable: 'The extension backend failed before answering. The app logs (ocp app logs) have the details.',
+  backend_unreachable: "The extension didn't answer. Try again in a moment; if it keeps happening, ask a CMS admin to check the app.",
   cms_write_denied: 'The CMS API key in the app settings can read content but not change it.',
   delete_disabled: 'Deleting variations is turned off. An admin can turn it on in the app settings.',
 };

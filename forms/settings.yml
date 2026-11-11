@@ -6,15 +6,14 @@ sections:
         key: apiToken
         label: Personal access token
         help: >-
-          FX app → Profile → API Access → Generate new token. Needs write access to
-          the project's flags and events. Leave blank to keep the saved one.
+          In FX: Profile > API Access > Generate new token. Needs write access to the
+          project's flags and events. Leave blank to keep the saved one.
       - type: text
         key: sdkKey
         label: Site SDK key
         help: >-
-          The SDK key your site decides with (optimizely-nextjs-demo: OPTIMIZELY_FX_SDK_KEY).
-          The project and environment are read from it, so experiments always land where
-          the site looks.
+          The SDK key your site decides with (FX: Settings > Environments). The project and
+          environment are read from it, so experiments always land where the site looks.
       - type: button
         label: Save
         action: saveFx
@@ -26,9 +25,9 @@ sections:
         key: clientId
         label: Client ID
         help: >-
-          CMS → Settings → API Keys. Reads the open item's versions to find its variations.
-          Ending an experiment also writes content (publishing the winner, deleting
-          variations), which needs a key with content write access.
+          In the CMS: Settings > API Keys. Reads the open item's versions to find its
+          variations. Ending an experiment also writes content (publishing the winner,
+          deleting variations), which needs a key with content write access.
       - type: secret
         key: clientSecret
         label: Client secret
