@@ -22,8 +22,8 @@ export function AudiencePicker({
   if (audiences.length === 0) {
     return (
       <Text color="fg.secondary" fontSize="sm">
-        {selected.length > 0 ? `Audience IDs ${selected.join(', ')} (from app settings).` : 'Every visitor.'} Add the
-        site&apos;s SDK key in the app settings to pick audiences by name.
+        {selected.length > 0 ? `Audience IDs ${selected.join(', ')}.` : 'Every visitor.'} Save the site&apos;s SDK key
+        in the app settings to pick audiences by name.
       </Text>
     );
   }

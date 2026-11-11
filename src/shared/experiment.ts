@@ -157,11 +157,13 @@ export function routeCovers(route: string, path: string): boolean {
 
 /**
  * The paths visitors request this page on. The CMS's public URL is a starting point
- * only: instances differ on whether default-language URLs carry the locale prefix, and
- * the site's router compares the raw request path, so a route built from the wrong form
- * never applies. Other languages keep the form the CMS reports.
+ * only: sites differ on whether default-language URLs carry the locale prefix, and the
+ * site's router compares the raw request path, so a route built from the wrong form
+ * never applies. The page's primary language gets both forms (a form the site doesn't
+ * use costs nothing); other languages keep the form the CMS reports, so a translation's
+ * test never lands on a default-language page with the same slug.
  */
-export function visitorPaths(publicUrl: string | undefined, locale: string, profile: SiteProfile): string[] {
+export function visitorPaths(publicUrl: string | undefined, locale: string, primaryLocale: string): string[] {
   if (!publicUrl) return [];
   let pathname: string;
   try {
@@ -170,20 +172,18 @@ export function visitorPaths(publicUrl: string | undefined, locale: string, prof
     return [];
   }
   const path = stripSlash(pathname);
-  if (locale.toLowerCase() !== profile.defaultLocale.toLowerCase()) return [path];
+  if (locale.toLowerCase() !== primaryLocale.toLowerCase()) return [path];
 
   const segments = path.split('/').filter(Boolean);
   const prefixed = segments[0]?.toLowerCase() === locale.toLowerCase();
   const bare = prefixed ? `/${segments.slice(1).join('/')}` : path;
   const withPrefix = `/${prefixed ? segments[0] : locale.toLowerCase()}${bare === '/' ? '' : bare}`;
-  if (profile.defaultLocaleUrls === 'bare') return [bare];
-  if (profile.defaultLocaleUrls === 'prefixed') return [withPrefix];
   return [bare, withPrefix];
 }
 
 /** The route suggested for a new experiment on this page. */
-export function defaultRoute(publicUrl: string | undefined, locale: string, profile: SiteProfile): string {
-  return visitorPaths(publicUrl, locale, profile).join(', ');
+export function defaultRoute(publicUrl: string | undefined, locale: string, primaryLocale: string): string {
+  return visitorPaths(publicUrl, locale, primaryLocale).join(', ');
 }
 
 /** The visitor paths `route` does not cover. */

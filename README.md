@@ -2,7 +2,7 @@
 
 An Optimizely CMS (SaaS) UI extension, built as a CMS-scoped OCP app, that turns a page's CMS variations into a Feature Experimentation A/B test from inside the editor, and ends it by shipping the winner.
 
-It works with any site that serves CMS variations by FX decision. [docs/site-contract.md](docs/site-contract.md) lists what the site has to do; `optimizely-nextjs-demo` is the reference implementation, and the app's defaults match it. The convention in short:
+It works with any site that follows its convention for serving CMS variations by FX decision. [docs/site-contract.md](docs/site-contract.md) lists what the site has to do; `optimizely-nextjs-demo` is the reference implementation. Installing takes credentials only: nothing about the site is configured. The convention in short:
 - the CMS variation name equals the FX variation key;
 - a flag drives CMS content when its marker variable (`cms_flag`) is true, on the paths in its route variable (`cms_route`).
 
@@ -12,7 +12,7 @@ It works with any site that serves CMS variations by FX decision. [docs/site-con
 - Reads the open item's variations through the CMS REST API, and shows which variation you are editing.
 - **Create experiment** takes three choices: the variations, the metric, and who takes part (audiences by name, traffic %).
   - **Flag:** the marker and route variables are set as *defaults*, so a variation added later in the FX UI inherits them. Flag key, name and route are suggested and sit under *Advanced*.
-  - **Route:** suggested for every URL visitors use for the page (with and without the language prefix, per the site settings).
+  - **Route:** suggested for every URL visitors use for the page: with and without the language prefix for the page's primary language, as the CMS reports it for translations.
   - **Variations:** one FX variation per chosen CMS variation, plus `control` for the original page.
   - **A/B rule:** an even split, the traffic %, the audiences and metrics. It can start straight away.
 - **Readiness checklist** before starting: the page and every variation in the test are published (Start is refused otherwise, here and in the backend), a metric is set, the route covers the page's URLs (with a one-click fix), nothing else changes the page (other experiments *and* personalization deliveries), and no variations from another tool (`wx_*`) are on the page.
@@ -32,9 +32,11 @@ It works with any site that serves CMS variations by FX decision. [docs/site-con
 Every linked experiment on this CMS instance: status (including ended tests and their winner), split, primary metric, start/pause, links to results and the flag, removal of links whose flag is gone, and the CMS flags in FX that no page links to.
 
 ## Settings
-- **Feature Experimentation:** a personal access token with write access to flags and events, and the **SDK key the site uses**. The project and environment are read from that key's datafile, so experiments always land where the site decides. Optional default audiences.
+Five fields, and nothing about the site:
+- **Feature Experimentation:** a personal access token with write access to flags and events, and the **SDK key the site uses**. The project and environment are read from that key's datafile, so experiments always land where the site decides.
 - **CMS API client:** client ID and secret (CMS → Settings → API Keys). Reading variations needs read access; ending a test needs content write access. **Let "End experiment" delete CMS variations** is off by default.
-- **Site convention (optional):** marker and route variable names, the original-page variation key, reserved flag keys and variation prefixes, the URL key separator, the default language and its URL form, and the preview path. Blank fields use the optimizely-nextjs-demo convention.
+
+The site convention (variable names, `control`, reserved names, the URL separator and the preview path) is fixed in `DEFAULT_PROFILE` in `src/shared/profile.ts`, not a setting. For a site with different names, change that one object.
 
 Installs saved before the SDK key setting keep working with their project ID and environment until the settings are saved again, without the datafile checks (live status, audiences by name, per-variation variables).
 

@@ -58,6 +58,8 @@ export interface Deps {
 interface ResolvedContent {
   key: string;
   locale: string;
+  /** The language the item was created in; its URLs get both the bare and the prefixed form. */
+  primaryLocale: string;
   displayName: string;
   variations: CmsVariation[];
   basePublished: boolean;
@@ -94,8 +96,13 @@ export async function listVersionsOrExplain(cms: CmsClient, key: string, locale:
 async function resolveContent({cms}: Deps, ref: ContentRef): Promise<ResolvedContent> {
   // Already normalized when the request came through the router; direct callers (tests) may pass dashes.
   const key = normalizeKey(ref.key);
-  const locale = ref.locale || (await cms.primaryLocale(key));
-  const versions = await listVersionsOrExplain(cms, key, locale);
+  // The editor normally reports the locale, so both reads can run at once.
+  const [primaryLocale, versionsInRefLocale] = await Promise.all([
+    cms.primaryLocale(key),
+    ref.locale ? listVersionsOrExplain(cms, key, ref.locale) : null,
+  ]);
+  const locale = ref.locale || primaryLocale;
+  const versions = versionsInRefLocale ?? (await listVersionsOrExplain(cms, key, locale));
   const {variations, displayName, basePublished} = summarizeVersions(versions);
 
   let currentVariation: string | null = null;
@@ -106,6 +113,7 @@ async function resolveContent({cms}: Deps, ref: ContentRef): Promise<ResolvedCon
   return {
     key,
     locale,
+    primaryLocale,
     displayName: displayName || key,
     variations,
     basePublished,
@@ -245,7 +253,7 @@ export async function getStatus(deps: Deps, ref: ContentRef): Promise<StatusResu
   }
 
   const live = await livePromise;
-  const paths = visitorPaths(content.publicUrl, content.locale, profile);
+  const paths = visitorPaths(content.publicUrl, content.locale, content.primaryLocale);
   const armKeys = rule ? rule.variations.map((v) => v.key) : [];
   return {
     content: {
@@ -255,7 +263,7 @@ export async function getStatus(deps: Deps, ref: ContentRef): Promise<StatusResu
       currentVariation: content.currentVariation,
       basePublished: content.basePublished,
       suggestedFlagKey: defaultFlagKey(content.displayName, content.key.slice(0, 8)),
-      suggestedRoute: defaultRoute(content.publicUrl, content.locale, profile),
+      suggestedRoute: defaultRoute(content.publicUrl, content.locale, content.primaryLocale),
       visitorPaths: paths,
     },
     cmsVariations: content.variations,
@@ -270,7 +278,6 @@ export async function getStatus(deps: Deps, ref: ContentRef): Promise<StatusResu
     settings: {
       projectId: deps.fx.projectId,
       environmentKey: deps.fx.environmentKey,
-      audienceIds: deps.fx.audienceIds,
       allowDelete: deps.allowDelete,
       profile,
     },
@@ -732,7 +739,7 @@ export async function deleteVariations(deps: Deps, {content: ref, confirm}: Acti
   const {content, link, loaded, fx} = await requireLinked(deps, ref, {ended: true});
   if (!link.conclusion) throw new ActionError('not_ended', 'End the experiment before deleting its variations.');
   const live = await liveState(deps, fx).catch(() => null);
-  const paths = visitorPaths(content.publicUrl, content.locale, deps.profile);
+  const paths = visitorPaths(content.publicUrl, content.locale, content.primaryLocale);
   const candidates = deleteCandidates(content, link, Object.keys(loaded.rule.variations ?? {}), live?.rules ?? null, paths, deps.profile);
   const listed = candidates.map((c) => c.name).sort().join(',');
   if (listed !== [...confirm].sort().join(',')) {

@@ -13,7 +13,6 @@ export interface FxConfig {
   environmentKey: string;
   /** The site's SDK key; its datafile is what visitors are decided from. '' on installs saved before it existed. */
   sdkKey: string;
-  audienceIds: number[];
 }
 
 interface FxVariableDefinition {
@@ -97,10 +96,6 @@ export class FxClient {
 
   public get projectId(): string {
     return this.cfg.projectId;
-  }
-
-  public get audienceIds(): number[] {
-    return this.cfg.audienceIds;
   }
 
   public get sdkKey(): string {

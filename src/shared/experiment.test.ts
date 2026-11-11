@@ -19,7 +19,7 @@ import {
   visitorPaths,
   withPaths,
 } from './experiment';
-import {DEFAULT_PROFILE as P, siteSettingsProblems, toSiteProfile} from './profile';
+import {DEFAULT_PROFILE as P} from './profile';
 
 describe('flagKeyProblem', () => {
   it('accepts FX-style keys', () => {
@@ -29,7 +29,7 @@ describe('flagKeyProblem', () => {
 
   it('rejects the site\'s reserved flag keys', () => {
     expect(flagKeyProblem('wx', P)).toMatch(/reserved/);
-    expect(flagKeyProblem('wx', toSiteProfile({reservedFlagKeys: 'other'}))).toBeNull();
+    expect(flagKeyProblem('wx', {...P, reservedFlagKeys: ['other']})).toBeNull();
   });
 
   it('rejects empty, invalid characters and the site URL separator', () => {
@@ -52,11 +52,11 @@ describe('variationNameProblem', () => {
 
   it('rejects names another tool owns (wx_ by default)', () => {
     expect(variationNameProblem('wx_hero', P)).toMatch(/another tool/);
-    expect(variationNameProblem('wx_hero', toSiteProfile({reservedVariationPrefixes: 'abc_'}))).toBeNull();
+    expect(variationNameProblem('wx_hero', {...P, reservedVariationPrefixes: ['abc_']})).toBeNull();
   });
 
   it('follows a configured control key', () => {
-    const profile = toSiteProfile({controlKey: 'original'});
+    const profile = {...P, controlKey: 'original'};
     expect(variationNameProblem('original', profile)).toMatch(/reserved/);
     expect(variationNameProblem('control', profile)).toBeNull();
   });
@@ -113,12 +113,11 @@ describe('defaults', () => {
     expect(defaultFlagKey('x'.repeat(100), 'abc').length).toBeLessThanOrEqual(64);
   });
 
-  it('turns a public URL into the route visitors request', () => {
-    const bare = toSiteProfile({defaultLocaleUrls: 'bare'});
-    expect(defaultRoute('https://site.example/savings/', 'en', bare)).toBe('/savings');
-    expect(defaultRoute('https://site.example/', 'en', bare)).toBe('/');
-    expect(defaultRoute('/investments/', 'en', bare)).toBe('/investments');
-    expect(defaultRoute(undefined, 'en', bare)).toBe('');
+  it('turns a public URL into the routes visitors request', () => {
+    expect(defaultRoute('https://site.example/savings/', 'en', 'en')).toBe('/savings, /en/savings');
+    expect(defaultRoute('https://site.example/', 'en', 'en')).toBe('/, /en');
+    expect(defaultRoute('/investments/', 'nl', 'en')).toBe('/investments');
+    expect(defaultRoute(undefined, 'en', 'en')).toBe('');
   });
 
   it('parses audience ids leniently', () => {
@@ -218,30 +217,31 @@ describe('routeCovers', () => {
 });
 
 describe('visitorPaths', () => {
-  it('offers both default-language forms by default', () => {
+  it('gives the primary language both URL forms', () => {
     // cms_personal_banking was created as /en/personal-banking, which English visitors never request.
-    expect(visitorPaths('https://site.example/en/personal-banking/', 'en', P)).toEqual([
+    expect(visitorPaths('https://site.example/en/personal-banking/', 'en', 'en')).toEqual([
       '/personal-banking',
       '/en/personal-banking',
     ]);
-    expect(visitorPaths('https://site.example/personal-banking', 'en', P)).toEqual([
+    expect(visitorPaths('https://site.example/personal-banking', 'en', 'en')).toEqual([
       '/personal-banking',
       '/en/personal-banking',
     ]);
-    expect(visitorPaths('https://site.example/', 'en', P)).toEqual(['/', '/en']);
+    expect(visitorPaths('https://site.example/', 'en', 'en')).toEqual(['/', '/en']);
   });
 
-  it('follows the configured URL style', () => {
-    expect(visitorPaths('https://site.example/en/x', 'en', toSiteProfile({defaultLocaleUrls: 'bare'}))).toEqual(['/x']);
-    expect(visitorPaths('https://site.example/x', 'en', toSiteProfile({defaultLocaleUrls: 'prefixed'}))).toEqual(['/en/x']);
+  it('follows the page, not a site setting, for the primary language', () => {
+    // A site whose pages are created in Dutch first.
+    expect(visitorPaths('https://site.example/nl/sparen', 'nl', 'nl')).toEqual(['/sparen', '/nl/sparen']);
   });
 
-  it('keeps other languages as the CMS reports them', () => {
-    expect(visitorPaths('https://site.example/nl/sparen/', 'nl', P)).toEqual(['/nl/sparen']);
+  it('keeps translations as the CMS reports them', () => {
+    // A bare /about here would also be the English page.
+    expect(visitorPaths('https://site.example/nl/about/', 'nl', 'en')).toEqual(['/nl/about']);
   });
 
   it('lists the paths a route misses, and adds them', () => {
-    const paths = visitorPaths('https://site.example/en/personal-banking', 'en', P);
+    const paths = visitorPaths('https://site.example/en/personal-banking', 'en', 'en');
     expect(uncoveredPaths('/en/personal-banking', paths)).toEqual(['/personal-banking']);
     expect(withPaths('/en/personal-banking', paths)).toBe('/en/personal-banking, /personal-banking');
     expect(withPaths('/*', paths)).toBe('/*');
@@ -259,20 +259,6 @@ describe('previewUrl', () => {
   });
 
   it('is off when the site has no preview path', () => {
-    expect(previewUrl('https://site.example/x', '/x', 'f', 'v', toSiteProfile({previewPath: 'none'}))).toBeNull();
-  });
-});
-
-describe('site settings', () => {
-  it('fills blanks with the optimizely-nextjs-demo convention', () => {
-    expect(toSiteProfile({})).toEqual(P);
-    expect(toSiteProfile({markerVariable: '  ', reservedFlagKeys: ''})).toEqual(P);
-  });
-
-  it('rejects values the site could not use', () => {
-    expect(siteSettingsProblems({markerVariable: 'has space'}).markerVariable).toBeTruthy();
-    expect(siteSettingsProblems({markerVariable: 'x', routeVariable: 'x'}).routeVariable).toBeTruthy();
-    expect(siteSettingsProblems({previewPath: '/__v_{flag}'}).previewPath).toBeTruthy();
-    expect(siteSettingsProblems({previewPath: 'none', defaultLocale: 'en-GB'})).toEqual({});
+    expect(previewUrl('https://site.example/x', '/x', 'f', 'v', {...P, previewPath: ''})).toBeNull();
   });
 });

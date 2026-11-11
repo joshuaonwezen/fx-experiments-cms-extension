@@ -30,7 +30,7 @@ import {
   unlink,
 } from '../../src/backend/lib/experiments';
 import {FxClient} from '../../src/backend/lib/fx';
-import {toSiteProfile} from '../../src/shared/profile';
+import {DEFAULT_PROFILE} from '../../src/shared/profile';
 
 const live = process.env.FX_LIVE === '1';
 const token = process.env.OPTIMIZELY_FX_API_TOKEN ?? '';
@@ -53,13 +53,12 @@ describe.runIf(live)('experiment actions (live CMS + FX)', () => {
       projectId,
       environmentKey: 'production',
       sdkKey: process.env.FX_LIVE_SDK_KEY ?? '',
-      audienceIds: [5418466184790016],
     }),
     cms: new CmsClient({
       clientId: process.env.OPTIMIZELY_CMS_CLIENT_ID ?? '',
       clientSecret: process.env.OPTIMIZELY_CMS_CLIENT_SECRET ?? '',
     }),
-    profile: toSiteProfile(),
+    profile: DEFAULT_PROFILE,
     allowDelete: false,
   };
 

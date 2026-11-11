@@ -10,10 +10,8 @@ import {
   Request as AppRequest,
 } from '@zaiusinc/app-sdk';
 
-import {parseAudienceIds} from '../../shared/experiment';
-import {siteSettingsProblems, type SiteSettings} from '../../shared/profile';
 import {CmsClient} from '../lib/cms';
-import {datafileAudiences, fetchDatafile, isSdkKey} from '../lib/datafile';
+import {fetchDatafile, isSdkKey} from '../lib/datafile';
 import {FxClient} from '../lib/fx';
 import {ApiError} from '../lib/http';
 import {CmsSettings, FxSettings, readSection, toFxConfig} from '../lib/settings';
@@ -57,7 +55,6 @@ export class Lifecycle extends AppLifecycle {
     try {
       if (section === 'fx' && action === 'saveFx') return await this.saveFx(formData, result);
       if (section === 'cms' && action === 'saveCms') return await this.saveCms(formData, result);
-      if (section === 'site' && action === 'saveSite') return await this.saveSite(formData, result);
     } catch (error) {
       logger.error('Settings save failed', error);
       return result.addToast('danger', 'Could not save settings. Try again.');
@@ -70,7 +67,6 @@ export class Lifecycle extends AppLifecycle {
     const previous = await readSection<FxSettings>('fx');
     const apiToken = text(formData, 'apiToken') || previous.apiToken || '';
     const sdkKey = text(formData, 'sdkKey');
-    const audienceIds = text(formData, 'audienceIds');
     if (!apiToken) return result.addError('apiToken', 'Required.');
     if (!isSdkKey(sdkKey)) return result.addError('sdkKey', 'Paste the SDK key your site uses.');
 
@@ -78,12 +74,10 @@ export class Lifecycle extends AppLifecycle {
     // from its datafile rather than asking for them.
     let projectId: string;
     let environmentKey: string;
-    let audiences: Array<{id: number}>;
     try {
       const datafile = await fetchDatafile(sdkKey, {fresh: true});
       projectId = String(datafile.projectId);
       environmentKey = datafile.environmentKey;
-      audiences = datafileAudiences(datafile);
     } catch (error) {
       if (error instanceof ApiError && error.status < 500) {
         return result.addError('sdkKey', 'No datafile for this SDK key. Check it in FX → Settings → Environments.');
@@ -91,10 +85,7 @@ export class Lifecycle extends AppLifecycle {
       throw error;
     }
 
-    const unknown = parseAudienceIds(audienceIds).filter((id) => !audiences.some((a) => a.id === id));
-    if (unknown.length > 0) return result.addError('audienceIds', `Not in this project: ${unknown.join(', ')}.`);
-
-    const next: FxSettings = {apiToken, sdkKey, projectId, environmentKey, audienceIds};
+    const next: FxSettings = {apiToken, sdkKey, projectId, environmentKey};
     try {
       const environments = await new FxClient(toFxConfig(next)).listEnvironments();
       if (!environments.includes(environmentKey)) {
@@ -137,28 +128,6 @@ export class Lifecycle extends AppLifecycle {
     await storage.settings.put('cms', {...next});
     logger.info('CMS settings saved', {allowDelete: next.allowDelete});
     return result.addToast('success', 'CMS API client saved.');
-  }
-
-  private async saveSite(formData: SubmittedFormData, result: LifecycleSettingsResult) {
-    const keys: Array<keyof SiteSettings> = [
-      'markerVariable',
-      'routeVariable',
-      'controlKey',
-      'reservedFlagKeys',
-      'reservedVariationPrefixes',
-      'keySeparator',
-      'defaultLocale',
-      'defaultLocaleUrls',
-      'previewPath',
-    ];
-    const next: SiteSettings = Object.fromEntries(keys.map((k) => [k, text(formData, k)]));
-    const problems = Object.entries(siteSettingsProblems(next));
-    if (problems.length > 0) {
-      for (const [field, message] of problems) result.addError(field, message!);
-      return result;
-    }
-    await storage.settings.put('site', {...next});
-    return result.addToast('success', 'Site convention saved.');
   }
 
   public async onAuthorizationRequest(

@@ -1,7 +1,6 @@
 import {logger, storage, ValueHash} from '@zaiusinc/app-sdk';
 
-import {parseAudienceIds} from '../../shared/experiment';
-import {toSiteProfile, type SiteProfile, type SiteSettings} from '../../shared/profile';
+import {DEFAULT_PROFILE, type SiteProfile} from '../../shared/profile';
 import type {CmsConfig} from './cms';
 import type {FxConfig} from './fx';
 
@@ -13,7 +12,6 @@ export type FxSettings = {
   sdkKey?: string;
   projectId?: string;
   environmentKey?: string;
-  audienceIds?: string;
 };
 
 export type CmsSettings = {
@@ -22,8 +20,6 @@ export type CmsSettings = {
   /** Lets "End experiment" delete the test's CMS variations. Off unless an admin turns it on. */
   allowDelete?: boolean;
 };
-
-export type {SiteSettings};
 
 export const DEFAULT_ENVIRONMENT = 'production';
 
@@ -37,7 +33,6 @@ export function toFxConfig(s: FxSettings): FxConfig {
     projectId: s.projectId?.trim() ?? '',
     environmentKey: s.environmentKey?.trim() || DEFAULT_ENVIRONMENT,
     sdkKey: s.sdkKey?.trim() ?? '',
-    audienceIds: parseAudienceIds(s.audienceIds),
   };
 }
 
@@ -56,11 +51,7 @@ export async function readSection<T extends ValueHash>(section: string): Promise
 }
 
 export async function loadConfig(): Promise<LoadedConfig> {
-  const [fxSettings, cmsSettings, siteSettings] = await Promise.all([
-    readSection<FxSettings>('fx'),
-    readSection<CmsSettings>('cms'),
-    readSection<SiteSettings>('site'),
-  ]);
+  const [fxSettings, cmsSettings] = await Promise.all([readSection<FxSettings>('fx'), readSection<CmsSettings>('cms')]);
   const fx = toFxConfig(fxSettings);
   const cms = {clientId: cmsSettings.clientId?.trim() ?? '', clientSecret: cmsSettings.clientSecret?.trim() ?? ''};
 
@@ -74,5 +65,5 @@ export async function loadConfig(): Promise<LoadedConfig> {
   ].filter((m): m is string => Boolean(m));
 
   if (missing.length > 0) return {ok: false, missing};
-  return {ok: true, fx, cms, profile: toSiteProfile(siteSettings), allowDelete: cmsSettings.allowDelete === true};
+  return {ok: true, fx, cms, profile: DEFAULT_PROFILE, allowDelete: cmsSettings.allowDelete === true};
 }

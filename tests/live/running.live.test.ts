@@ -14,7 +14,7 @@ const projectId = process.env.OPTIMIZELY_FX_PROJECT_ID ?? '';
 const sdkKey = process.env.FX_LIVE_SDK_KEY ?? '';
 
 describe.runIf(live)('running CMS experiments (live, read-only)', () => {
-  const fx = new FxClient({token, projectId, environmentKey: 'production', sdkKey, audienceIds: []});
+  const fx = new FxClient({token, projectId, environmentKey: 'production', sdkKey});
 
   it('lists flags with variables and per-environment rules', async () => {
     const flags = await fx.listFlags();

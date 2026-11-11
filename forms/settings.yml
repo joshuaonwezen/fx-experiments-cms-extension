@@ -15,12 +15,6 @@ sections:
           The SDK key your site decides with (optimizely-nextjs-demo: OPTIMIZELY_FX_SDK_KEY).
           The project and environment are read from it, so experiments always land where
           the site looks.
-      - type: text
-        key: audienceIds
-        label: Default audience IDs (optional)
-        help: >-
-          Comma-separated audience IDs preselected for new experiments. Editors can change
-          the audience per experiment in the sidebar.
       - type: button
         label: Save
         action: saveFx
@@ -49,64 +43,4 @@ sections:
       - type: button
         label: Save
         action: saveCms
-        style: primary
-  - key: site
-    label: Site convention (optional)
-    elements:
-      - type: instructions
-        text: >-
-          How your site maps FX decisions to CMS content. Leave a field blank to use the
-          optimizely-nextjs-demo convention shown in its help text.
-      - type: text
-        key: markerVariable
-        label: Marker variable
-        help: Boolean flag variable that marks a flag as driving CMS content. Default cms_flag.
-      - type: text
-        key: routeVariable
-        label: Route variable
-        help: String flag variable holding the path(s) the flag applies on. Default cms_route.
-      - type: text
-        key: controlKey
-        label: Original-page variation key
-        help: FX variation that serves the page unchanged. Default control.
-      - type: text
-        key: reservedFlagKeys
-        label: Reserved flag keys
-        help: Comma-separated flag keys your site uses for something else. Default wx.
-      - type: text
-        key: reservedVariationPrefixes
-        label: Reserved variation prefixes
-        help: >-
-          CMS variations starting with these belong to another tool and are never added
-          to an experiment. Default wx_ (Web Experimentation).
-      - type: text
-        key: keySeparator
-        label: Key separator
-        help: Text your site puts between flag and variation key in URLs; keys may not contain it. Default --.
-      - type: text
-        key: defaultLocale
-        label: Default language
-        help: The site's default language code. Default en.
-      - type: select
-        key: defaultLocaleUrls
-        label: Default-language URLs
-        help: >-
-          Which URLs visitors reach default-language pages on. Experiments are suggested
-          for every form you pick here.
-        options:
-          - text: Both /page and /en/page (default)
-            value: both
-          - text: Without the language, /page
-            value: bare
-          - text: With the language, /en/page
-            value: prefixed
-      - type: text
-        key: previewPath
-        label: Preview path
-        help: >-
-          Path that shows one variation on the live site. Placeholders {path}, {flag},
-          {variation}. Default {path}/__v_{flag}--{variation}. Enter none to hide preview links.
-      - type: button
-        label: Save
-        action: saveSite
         style: primary

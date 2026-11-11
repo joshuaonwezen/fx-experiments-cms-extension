@@ -5,11 +5,9 @@
 1. Install the app on the CMS instance.
 2. In the app settings:
    - **Feature Experimentation**: a personal access token with write access, and the SDK key your site uses.
-     The project and environment are read from the SDK key. Optionally, audiences to preselect.
+     The project and environment are read from the SDK key.
    - **CMS API client**: a client ID and secret from CMS → Settings → API Keys. Ending a test publishes and
      deletes content, so use a key with content write access. Deleting variations stays off until you turn it on.
-   - **Site convention**: only if your site differs from optimizely-nextjs-demo (variable names, the original-page
-     variation key, reserved names, URL style).
 3. Open a page that has variations. The **Feature Experimentation** panel appears in the editor sidebar.
 
 ## Running a test

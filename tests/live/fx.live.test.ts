@@ -19,7 +19,7 @@ const RULE = `${FLAG}_experiment`;
 const DELIVERY = `${FLAG}_winner`;
 
 describe.runIf(live)('FX lifecycle (live)', () => {
-  const fx = new FxClient({token, projectId, environmentKey: 'production', sdkKey: '', audienceIds});
+  const fx = new FxClient({token, projectId, environmentKey: 'production', sdkKey: ''});
 
   afterAll(async () => {
     // Pause and archive so the datafile (and exp:seed) never sees a running smoke flag.

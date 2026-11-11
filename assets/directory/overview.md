@@ -9,5 +9,5 @@ Turn a page's CMS variations into a Feature Experimentation A/B test without lea
 - **Experiments** view: every CMS-driven experiment on this instance, with status, winners and results links.
 
 Works with sites that serve CMS variations by FX variation key (CMS variation name = FX variation key, flags marked
-with a marker and a route variable). The defaults match optimizely-nextjs-demo; other conventions are set in the
-app settings.
+with `cms_flag` and `cms_route` variables), such as optimizely-nextjs-demo. Setup is credentials only: an FX token,
+the site's SDK key and a CMS API client.

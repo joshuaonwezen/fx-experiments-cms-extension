@@ -37,7 +37,7 @@ export function CreatePanel(props: PanelProps) {
   const [chosen, setChosen] = useState<string[]>(valid.map((v) => v.name));
   const [traffic, setTraffic] = useState('100');
   const [eventIds, setEventIds] = useState<number[]>([]);
-  const [audienceIds, setAudienceIds] = useState<number[]>(status.settings.audienceIds);
+  const [audienceIds, setAudienceIds] = useState<number[]>([]);
   const [start, setStart] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

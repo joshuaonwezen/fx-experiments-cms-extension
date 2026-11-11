@@ -2,8 +2,9 @@
 
 The extension creates Feature Experimentation flags whose variations are CMS variations. It works with any site
 that turns an FX decision into "show this CMS variation of the page". This page lists what such a site has to do.
-optimizely-nextjs-demo is the reference implementation; the names in brackets are its defaults, and every one of
-them can be changed in the app's **Site convention** settings.
+optimizely-nextjs-demo is the reference implementation. The names in brackets are the convention; they are fixed in
+`DEFAULT_PROFILE` (`src/shared/profile.ts`), so installs need no site settings. A site with different names changes
+that one object.
 
 ## The flag
 
@@ -12,9 +13,9 @@ them can be changed in the app's **Site convention** settings.
 - **A string route variable** (`cms_route`). The site applies the flag only on request paths it covers.
   The extension sets both as variable **defaults**, so a variation added later in FX inherits them. A flag may also
   set them per variation; the extension reads the effective value either way.
-- **Decide on the raw request path.** The extension suggests routes for the URLs visitors actually request, using
-  the "Default-language URLs" setting (`/page`, `/en/page`, or both). A route that only covers one form misses the
-  other.
+- **Decide on the raw request path.** For a page's primary language the extension suggests both `/page` and
+  `/en/page`, so it works whether or not the site prefixes its default language (a form the site doesn't use costs
+  nothing). Translations keep the URL the CMS reports, e.g. `/nl/page`.
 
 ### Route syntax
 
@@ -58,6 +59,6 @@ Matching is case-sensitive and ignores trailing slashes and the query string.
 
 ## Previews
 
-The optional **Preview path** (`{path}/__v_{flag}--{variation}`) is a URL that shows one variation on the live
-site. Leave it as `none` if the site has no such URL. In optimizely-nextjs-demo the preview only works while the
+Preview links use `{path}/__v_{flag}--{variation}`, a URL that shows one variation on the live site. A site without
+such a URL sets `previewPath` to `''` in `DEFAULT_PROFILE` to hide them. In optimizely-nextjs-demo the preview only works while the
 test runs, because the site checks the variation against the live datafile.

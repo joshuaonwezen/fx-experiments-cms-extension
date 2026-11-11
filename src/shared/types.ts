@@ -158,7 +158,6 @@ export interface StatusResult {
   settings: {
     projectId: string;
     environmentKey: string;
-    audienceIds: number[];
     allowDelete: boolean;
     profile: SiteProfile;
   };
