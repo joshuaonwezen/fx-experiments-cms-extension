@@ -1,7 +1,7 @@
 meta:
   app_id: fx_cms_experiments
   display_name: Feature Experimentation
-  version: 0.0.1-dev.9
+  version: 0.0.1-dev.10
   vendor: optimizely
   summary: Turn a page's CMS variations into a Feature Experimentation A/B test from the editor.
   support_url: https://www.optimizely.com
