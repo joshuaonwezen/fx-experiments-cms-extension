@@ -22,7 +22,7 @@ describe.runIf(live)('FX lifecycle (live)', () => {
   const fx = new FxClient({token, projectId, environmentKey: 'production', sdkKey: ''});
 
   afterAll(async () => {
-    // Pause and archive so the datafile (and exp:seed) never sees a running smoke flag.
+    // Pause and archive so the datafile (and anything seeding visitors) never sees a running smoke flag.
     for (const rule of [RULE, DELIVERY]) {
       try {
         await fx.setRuleRunning(FLAG, rule, false);

@@ -121,12 +121,12 @@ describe('defaults', () => {
   });
 
   it('parses audience ids leniently', () => {
-    expect(parseAudienceIds('5418466184790016, ,abc,42')).toEqual([5418466184790016, 42]);
+    expect(parseAudienceIds('1111222233334444, ,abc,42')).toEqual([1111222233334444, 42]);
     expect(parseAudienceIds(undefined)).toEqual([]);
   });
 
   it('normalizes content keys with or without dashes', () => {
-    expect(normalizeKey('3525E155-2b6f-4615-8be2-850ff6e6fb74')).toBe('3525e1552b6f46158be2850ff6e6fb74');
+    expect(normalizeKey('0F8E2D6C-4b1a-49e7-a3c5-d7f9b2e4c6a8')).toBe('0f8e2d6c4b1a49e7a3c5d7f9b2e4c6a8');
   });
 });
 

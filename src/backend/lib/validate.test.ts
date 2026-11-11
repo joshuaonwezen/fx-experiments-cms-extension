@@ -2,12 +2,12 @@ import {describe, expect, it} from 'vitest';
 
 import {contentRef, PARSERS} from './validate';
 
-const KEY = '3525e1552b6f46158be2850ff6e6fb74';
+const KEY = '0f8e2d6c4b1a49e7a3c5d7f9b2e4c6a8';
 
 describe('contentRef', () => {
   it('normalizes the key and keeps known fields only', () => {
     expect(
-      contentRef({key: '3525E155-2b6f-4615-8be2-850ff6e6fb74', locale: 'en', version: '6882', publicUrl: 'https://x.example/', extra: 1}),
+      contentRef({key: '0F8E2D6C-4b1a-49e7-a3c5-d7f9b2e4c6a8', locale: 'en', version: '6882', publicUrl: 'https://x.example/', extra: 1}),
     ).toEqual({key: KEY, locale: 'en', version: '6882', publicUrl: 'https://x.example/'});
   });
 

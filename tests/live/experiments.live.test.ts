@@ -1,13 +1,19 @@
 // End-to-end over the real CMS and FX APIs: the service layer the cms_extension function
-// routes to, with the app-sdk's in-memory stores standing in for OCP storage. Reads the
-// homepage's variations, builds an experiment on a scratch route (so nothing is served),
+// routes to, with the app-sdk's in-memory stores standing in for OCP storage. Reads a
+// page's variations, builds an experiment on a scratch route (so nothing is served),
 // exercises every action, then archives the flag.
 //
 // It ends the test through an FX rollout only. Never run the "make it the page in the
-// CMS" path here: it would publish a new version of the real homepage. Deleting is off
+// CMS" path here: it would publish a new version of the real page. Deleting is off
 // (allowDelete: false), so the cleanup step must be refused.
-//   FX_LIVE=1 OPTIMIZELY_FX_API_TOKEN=… OPTIMIZELY_FX_PROJECT_ID=… \
-//   OPTIMIZELY_CMS_CLIENT_ID=… OPTIMIZELY_CMS_CLIENT_SECRET=… yarn vitest run tests/live/experiments.live.test.ts
+//
+// The page needs at least four PUBLISHED variations, listed in FX_LIVE_VARIATIONS.
+//   FX_LIVE=1 OPTIMIZELY_FX_API_TOKEN=… OPTIMIZELY_FX_PROJECT_ID=… [FX_LIVE_SDK_KEY=…] \
+//   OPTIMIZELY_CMS_CLIENT_ID=… OPTIMIZELY_CMS_CLIENT_SECRET=… \
+//   FX_LIVE_CONTENT_KEY=<content key> FX_LIVE_VARIATIONS=a,b,c,d \
+//   [FX_LIVE_LOCALE=en] [FX_LIVE_VERSION=<a variation's version>] \
+//   [FX_LIVE_PUBLIC_URL=https://www.example.com/page] [FX_LIVE_AUDIENCE_IDS=123,456] \
+//   yarn vitest run tests/live/experiments.live.test.ts
 import {afterAll, describe, expect, it} from 'vitest';
 
 import {CmsClient} from '../../src/backend/lib/cms';
@@ -37,17 +43,20 @@ const live = process.env.FX_LIVE === '1';
 const token = process.env.OPTIMIZELY_FX_API_TOKEN ?? '';
 const projectId = process.env.OPTIMIZELY_FX_PROJECT_ID ?? '';
 
-// The personal instance's homepage: four published variations (business, investments,
-// mortgages, personal); version 6882 is the investments variation.
+const envList = (raw: string | undefined) => (raw ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+// Four of the page's published variations: two start the test, one is added later and
+// removed again, and the winner is shipped from FX.
+const [A, B, C, D] = envList(process.env.FX_LIVE_VARIATIONS);
+const audienceIds = envList(process.env.FX_LIVE_AUDIENCE_IDS).map(Number);
 const content = {
-  key: '3525e155-2b6f-4615-8be2-850ff6e6fb74',
-  locale: 'en',
-  version: '6882',
-  publicUrl: 'https://opti.joshuaonwezen.dev/',
+  key: process.env.FX_LIVE_CONTENT_KEY ?? '',
+  locale: process.env.FX_LIVE_LOCALE ?? 'en',
+  ...(process.env.FX_LIVE_VERSION ? {version: process.env.FX_LIVE_VERSION} : {}),
+  ...(process.env.FX_LIVE_PUBLIC_URL ? {publicUrl: process.env.FX_LIVE_PUBLIC_URL} : {}),
 };
 const FLAG = `cms_ext_e2e_${Date.now().toString(36)}`;
 
-describe.runIf(live)('experiment actions (live CMS + FX)', () => {
+describe.runIf(live && Boolean(content.key) && Boolean(D))('experiment actions (live CMS + FX)', () => {
   const deps: Deps = {
     fx: new FxClient({
       token,
@@ -74,14 +83,12 @@ describe.runIf(live)('experiment actions (live CMS + FX)', () => {
 
   it('reads the page and its variations from the CMS', async () => {
     const status = await getStatus(deps, content);
-    expect(status.content.key).toBe('3525e1552b6f46158be2850ff6e6fb74');
-    expect(status.content.currentVariation).toBe('investments');
-    // Both forms of the default-language URL.
-    expect(status.content.suggestedRoute).toBe('/, /en');
+    expect(status.content.key).toBe(content.key.replace(/-/g, '').toLowerCase());
+    if (content.version) expect(status.content.currentVariation).not.toBeNull();
+    // Both forms of the default-language URL start with a slash.
+    if (content.publicUrl) expect(status.content.suggestedRoute).toMatch(/^\//);
     expect(status.content.basePublished).toBe(true);
-    expect(status.cmsVariations.map((v) => v.name)).toEqual(
-      expect.arrayContaining(['business', 'investments', 'mortgages', 'personal']),
-    );
+    expect(status.cmsVariations.map((v) => v.name)).toEqual(expect.arrayContaining([A, B, C, D]));
     expect(status.link).toBeNull();
   });
 
@@ -95,9 +102,9 @@ describe.runIf(live)('experiment actions (live CMS + FX)', () => {
       flagKey: FLAG,
       flagName: 'CMS ext e2e',
       route: '/fx-ext-e2e',
-      variations: ['business', 'personal'],
+      variations: [A, B],
       eventIds: [e1.id, e2.id],
-      audienceIds: [5418466184790016],
+      audienceIds,
       trafficPercent: 50,
       start: false,
     });
@@ -107,28 +114,30 @@ describe.runIf(live)('experiment actions (live CMS + FX)', () => {
     expect(status.rule?.route).toBe('/fx-ext-e2e');
     expect(status.rule?.variations.map((v) => [v.key, v.percent])).toEqual([
       ['control', 33.34],
-      ['business', 33.33],
-      ['personal', 33.33],
+      [A, 33.33],
+      [B, 33.33],
     ]);
     expect(status.rule?.metrics.map((m) => m.eventId)).toEqual([e1.id, e2.id]);
     // FX only creates the experiment (and its results page) when the rule first starts.
     expect(status.rule?.resultsUrl).toBeNull();
-    expect(status.diff.missingInFx.sort()).toEqual(['investments', 'mortgages']);
+    expect(status.diff.missingInFx).toEqual(expect.arrayContaining([C, D]));
 
     await expect(
       createExperiment(deps, {
         content, displayName: 'x', flagKey: FLAG, flagName: 'x', route: '/x',
-        variations: ['business'], eventIds: [], audienceIds: [], trafficPercent: 100, start: false,
+        variations: [A], eventIds: [], audienceIds: [], trafficPercent: 100, start: false,
       }),
     ).rejects.toMatchObject({code: 'already_linked'});
 
     status = await syncVariations(deps, {content, confirmRunning: false});
-    expect(status.rule?.variations).toHaveLength(5);
+    // control plus every valid CMS variation on the page.
+    expect(status.rule!.variations.length).toBeGreaterThanOrEqual(5);
+    const armsAfterSync = status.rule!.variations.length;
     expect(status.rule?.variations.reduce((s, v) => s + v.percent, 0)).toBeCloseTo(100);
     expect(status.diff.missingInFx).toEqual([]);
 
-    status = await removeVariations(deps, {content, variations: ['mortgages'], confirmRunning: false});
-    expect(status.rule?.variations.map((v) => v.key)).not.toContain('mortgages');
+    status = await removeVariations(deps, {content, variations: [C], confirmRunning: false});
+    expect(status.rule?.variations.map((v) => v.key)).not.toContain(C);
     expect(status.rule?.variations.reduce((s, v) => s + v.percent, 0)).toBeCloseTo(100);
 
     status = await setTraffic(deps, {content, trafficPercent: 30});
@@ -157,22 +166,22 @@ describe.runIf(live)('experiment actions (live CMS + FX)', () => {
     const rows = await listExperiments(deps);
     expect(rows.find((r) => r.link.flagKey === FLAG)?.rule?.flagKey).toBe(FLAG);
 
-    // Ship "business" from FX: the A/B rule stops, a delivery serves the winner.
-    status = await endExperiment(deps, {content, winner: 'business', shipVia: 'fx'});
-    expect(status.link?.conclusion).toMatchObject({winner: 'business', shipVia: 'fx', deliveryRuleKey: `${FLAG}_winner`});
+    // Ship A from FX: the A/B rule stops, a delivery serves the winner.
+    status = await endExperiment(deps, {content, winner: A, shipVia: 'fx'});
+    expect(status.link?.conclusion).toMatchObject({winner: A, shipVia: 'fx', deliveryRuleKey: `${FLAG}_winner`});
     expect(status.rule?.running).toBe(false);
     // Resuming is a no-op, ending differently is refused.
-    await endExperiment(deps, {content, winner: 'business', shipVia: 'fx'});
-    await expect(endExperiment(deps, {content, winner: 'personal', shipVia: 'fx'})).rejects.toMatchObject({code: 'already_ended'});
-    // The winner stays; the homepage personas are protected by the homepage flag's deliveries.
-    expect(status.deleteCandidates.map((c) => c.name)).not.toContain('business');
+    await endExperiment(deps, {content, winner: A, shipVia: 'fx'});
+    await expect(endExperiment(deps, {content, winner: B, shipVia: 'fx'})).rejects.toMatchObject({code: 'already_ended'});
+    // The winner stays; variations another live rule serves on this page are protected too.
+    expect(status.deleteCandidates.map((c) => c.name)).not.toContain(A);
     await expect(deleteVariations(deps, {content, confirm: []})).rejects.toMatchObject({code: 'delete_disabled'});
 
     status = await unlink(deps, {content});
     expect(status.link).toBeNull();
     status = await linkExisting(deps, {content, displayName: 'Homepage (e2e)', flagKey: FLAG});
     expect(status.link?.ruleKey).toBe(`${FLAG}_experiment`);
-    expect(status.rule?.variations).toHaveLength(4);
+    expect(status.rule?.variations).toHaveLength(armsAfterSync - 1);
 
     await expect(linkExisting(deps, {content, displayName: 'x', flagKey: FLAG})).rejects.toBeInstanceOf(ActionError);
     await unlink(deps, {content});

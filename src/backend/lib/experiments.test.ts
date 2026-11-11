@@ -50,7 +50,7 @@ describe('diffVariations', () => {
 });
 
 describe('runningCmsExperiments', () => {
-  // Shapes from GET /flags/v1/projects/{p}/flags (project 23385830076, 2026-11-05).
+  // Shapes from GET /flags/v1/projects/{p}/flags (2026-11-05).
   const flag = (
     key: string,
     cmsFlag: string | null,
@@ -124,7 +124,7 @@ describe('listVersionsOrExplain', () => {
     }) as unknown as CmsClient;
 
   it('says media items cannot have variations', async () => {
-    // GET /v1/content/{key} for an image on joshCMS: no language versions.
+    // GET /v1/content/{key} for an image on a SaaS CMS instance: no language versions.
     const image = {key: '64c52fe72b1d48b98ced7122189e986b', contentType: 'ImageMedia', locales: ['']};
     await expect(listVersionsOrExplain(cmsWith(image), image.key, 'en')).rejects.toMatchObject({
       code: 'unsupported_content',
@@ -145,9 +145,9 @@ describe('listVersionsOrExplain', () => {
   });
 });
 
-// Trimmed from the live datafile of project 23385830076 (production, 2026-11-10).
+// Trimmed from the live datafile (production, 2026-11-10).
 const DATAFILE: Datafile = {
-  projectId: '23385830076',
+  projectId: '1234567890',
   environmentKey: 'production',
   featureFlags: [
     {
@@ -205,7 +205,7 @@ const DATAFILE: Datafile = {
     {id: 'r-nav', experiments: []},
   ],
   audiences: [
-    {id: '5418466184790016', name: 'Personal - CMS'},
+    {id: '1111222233334444', name: 'Returning visitors'},
     {id: '$opt_dummy_audience', name: 'Optimizely-Generated Audience for Backwards Compatibility'},
   ],
   typedAudiences: [{id: '6000', name: 'Business Users'}],
@@ -231,7 +231,7 @@ describe('liveCmsRules', () => {
     expect(isRuleLive(DATAFILE, 'homepage', 'paused_rule')).toBe(false);
     expect(datafileAudiences(DATAFILE)).toEqual([
       {id: 6000, name: 'Business Users'},
-      {id: 5418466184790016, name: 'Personal - CMS'},
+      {id: 1111222233334444, name: 'Returning visitors'},
     ]);
   });
 });
@@ -303,7 +303,7 @@ describe('deleteCandidates', () => {
     ]);
   });
 
-  it('protects variations another live rule serves on this page (homepage personas)', () => {
+  it('protects variations another live rule serves on this page (a personalization delivery)', () => {
     const ended = {...link, conclusion: {endedAt: '', winner: null, shipVia: null}};
     const personas = [
       {

@@ -10,8 +10,8 @@ describe('readSection', () => {
   });
 
   it('returns the saved section', async () => {
-    await storage.settings.put('fx', {apiToken: 'token', projectId: '23385830076'});
-    expect(await readSection('fx')).toEqual({apiToken: 'token', projectId: '23385830076'});
+    await storage.settings.put('fx', {apiToken: 'token', projectId: '1234567890'});
+    expect(await readSection('fx')).toEqual({apiToken: 'token', projectId: '1234567890'});
   });
 
   it('treats an unreadable store as empty, so loadConfig reports missing settings', async () => {
