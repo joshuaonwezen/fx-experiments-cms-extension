@@ -30,6 +30,7 @@ import type {
   DeleteCandidate,
   ExperimentLink,
   ExperimentRow,
+  ResultsAnswer,
   RuleSummary,
   RunningExperiment,
   StatusResult,
@@ -41,6 +42,7 @@ import {ActionError} from './errors';
 import {armsOf, FxClient, FxFlag, FxRule, FxRuleset, metricFor, runningCmsExperiments, summarizeRule} from './fx';
 import {ApiError} from './http';
 import {getLink, listLinks, removeLink, saveLink} from './links';
+import {summarizeResults} from './results';
 import {storedKeys} from './validate';
 
 export {ActionError};
@@ -789,6 +791,26 @@ export async function archiveFlag(deps: Deps, {content: ref}: ActionParams['arch
   await saveLink({...link, conclusion: {...ended, archived: true}});
   logger.info('Flag archived', {content: link.contentKey, flag: link.flagKey});
   return getStatus(deps, ref);
+}
+
+/** The open page's experiment results, for the sidebar. A rule FX can't compute yet is a note, not an error. */
+export async function getResults(deps: Deps, ref: ContentRef): Promise<ResultsAnswer> {
+  const content = await resolveContent(deps, ref);
+  const link = await getLink(content.key, content.locale);
+  if (!link) throw new ActionError('not_linked', 'This page has no experiment yet.');
+  const {rule, summary} = await loadRule(deps, link);
+  if (!summary.experimentId) return {results: null, note: 'Results start once the experiment has started.'};
+  const keyByName = new Map(Object.values(rule.variations ?? {}).map((v) => [v.name, v.key]));
+  try {
+    const raw = await deps.fx.forEnvironment(link.environmentKey).experimentResults(summary.experimentId);
+    const results = summarizeResults(raw, keyByName);
+    return {results, note: results ? null : 'FX has no results for this experiment yet.'};
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 400) {
+      return {results: null, note: 'FX can\'t compute results for this experiment yet. It needs a metric and some visitors.'};
+    }
+    throw error;
+  }
 }
 
 export async function listAudiences({fx}: Deps): Promise<AudienceOption[]> {

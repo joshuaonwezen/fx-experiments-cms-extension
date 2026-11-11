@@ -31,6 +31,30 @@ export interface AudienceOption {
   name: string;
 }
 
+export interface VariationResult {
+  /** The FX variation key, when the results name maps back to one. */
+  key: string | null;
+  name: string;
+  isBaseline: boolean;
+  samples: number;
+  rate: number | null;
+  /** Relative lift vs the baseline, e.g. 0.057 = +5.7%. */
+  lift: number | null;
+  significant: boolean;
+}
+
+/** The primary metric's results, as FX's results page computes them. */
+export interface ExperimentResults {
+  metric: string;
+  lastCalculated: string | null;
+  visitors: number;
+  variations: VariationResult[];
+  /** A variation that beats the original with significance, or null. */
+  leader: string | null;
+}
+
+export type ResultsAnswer = {results: ExperimentResults | null; note: string | null};
+
 export interface MetricSummary {
   eventId: number;
   title: string;
@@ -89,6 +113,8 @@ export interface RuleSummary {
   /** Some variations override the route variable, so editing the default would not move them. */
   routePerVariation: boolean;
   resultsUrl: string | null;
+  /** FX's experiment id for the rule (layer_experiment_id); null until the rule first starts. */
+  experimentId: string | null;
   flagUrl: string;
 }
 
@@ -197,6 +223,7 @@ export type ActionParams = {
   createEvent: {key: string; name: string};
   listAudiences: Record<string, never>;
   listCmsFlags: Record<string, never>;
+  getResults: {content: ContentRef};
   createExperiment: CreateExperimentParams;
   syncVariations: {content: ContentRef; confirmRunning: boolean};
   removeVariations: {content: ContentRef; variations: string[]; confirmRunning: boolean};
@@ -220,6 +247,7 @@ export type ActionResults = {
   createEvent: FxEvent;
   listAudiences: AudienceOption[];
   listCmsFlags: CmsFlagOption[];
+  getResults: ResultsAnswer;
   createExperiment: StatusResult;
   syncVariations: StatusResult;
   removeVariations: StatusResult;

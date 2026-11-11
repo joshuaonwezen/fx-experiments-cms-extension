@@ -18,10 +18,10 @@ It works with any site that follows its convention for serving CMS variations by
 - **Readiness checklist** before starting: the page and every variation in the test are published (Start is refused otherwise, here and in the backend), a metric is set, the route covers the page's URLs (with a one-click fix), nothing else changes the page (other experiments *and* personalization deliveries), and no variations from another tool (`wx_*`) are on the page.
 - **Once linked:**
   - Start / Pause. After starting, it checks the site's datafile until the test is live.
-  - **View results** (`fetch_results_ui_url`, created the first time the rule starts) and **Open flag in FX**.
+  - **Results in the panel:** visitors, conversion rate and lift per variation for the primary metric, with significant lifts marked and a significant winner named (`GET /v2/experiments/{layer_experiment_id}/results`). **Full results in FX** opens FX's own page in a new tab.
   - A CMS ↔ FX variation table with **Preview** links on the live site, **Remove** per variation, and **Add to experiment** for new CMS variations. Adding keeps a custom split's proportions. On a running test both ask first.
   - Edit traffic, audiences, metrics (the first is primary; new events can be created inline) and the route.
-- **End experiment:** pick the winner (or no winner), then either
+- **End experiment:** shows the results and preselects a significant winner; pick the winner (or no winner), then either
   - **serve it to everyone from FX:** pauses the A/B rule and adds a targeted delivery of the winner, or
   - **make it the page in the CMS:** publishes a new version of the page with the winner's content (an approval workflow is respected; the step resumes once it is approved).
   Afterwards it can **delete the test's variations** from the CMS (only when an admin has turned that on, after typing a confirmation, and never a variation another live rule still serves), and **archive the flag**.

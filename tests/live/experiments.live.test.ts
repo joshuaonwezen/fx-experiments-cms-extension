@@ -17,6 +17,7 @@ import {
   deleteVariations,
   Deps,
   endExperiment,
+  getResults,
   getStatus,
   linkExisting,
   listExperiments,
@@ -144,6 +145,11 @@ describe.runIf(live)('experiment actions (live CMS + FX)', () => {
 
     status = await setRunning(deps, {content, running: true});
     expect(status.rule?.running).toBe(true);
+    expect(status.rule?.experimentId).toMatch(/^\d+$/);
+    // A fresh experiment has no visitors: either an empty table or a note, never an error.
+    const answer = await getResults(deps, content);
+    console.log('results', JSON.stringify(answer));
+    expect(answer.results !== null || answer.note !== null).toBe(true);
     expect(status.rule?.resultsUrl).toMatch(/^https:\/\/app\.optimizely\.com\/v2\/projects\/\d+\/results\//);
     status = await setRunning(deps, {content, running: false});
     expect(status.rule?.running).toBe(false);

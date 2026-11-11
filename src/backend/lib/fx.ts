@@ -3,6 +3,7 @@ import type {Arm} from '../../shared/experiment';
 import type {SiteProfile} from '../../shared/profile';
 import type {FxEvent, RuleSummary, RunningExperiment} from '../../shared/types';
 import {ApiError, requestJson} from './http';
+import type {RawResults} from './results';
 
 const FLAGS_API = 'https://api.optimizely.com/flags/v1';
 const V2_API = 'https://api.optimizely.com/v2';
@@ -68,6 +69,8 @@ export interface FxRule {
   metrics?: FxMetric[];
   variations: Record<string, {key: string; name: string; percentage_included: number}>;
   fetch_results_ui_url?: string;
+  /** FX's experiment id for the rule; set once the rule has started. */
+  layer_experiment_id?: number | null;
 }
 
 export interface FxRuleset {
@@ -354,6 +357,11 @@ export class FxClient {
     return {id: event.id, key: event.key, name: event.name || event.key};
   }
 
+  /** The rule's results as FX computes them (by its layer_experiment_id). */
+  public async experimentResults(experimentId: string): Promise<RawResults | null> {
+    return this.request<RawResults>('FX results', `${V2_API}/experiments/${encodeURIComponent(experimentId)}/results`);
+  }
+
   public flagUrl(flagKey: string): string {
     return `${FX_APP_BASE}/projects/${this.cfg.projectId}/flags/manage/${flagKey}/rules/${this.cfg.environmentKey}`;
   }
@@ -499,6 +507,7 @@ export function summarizeRule(
     route,
     routePerVariation: perVariation,
     resultsUrl: rule.fetch_results_ui_url ?? null,
+    experimentId: rule.layer_experiment_id ? String(rule.layer_experiment_id) : null,
     flagUrl,
   };
 }

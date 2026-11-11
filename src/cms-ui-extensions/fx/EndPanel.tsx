@@ -1,14 +1,15 @@
 import {Alert, Button, Group, Heading, Radio, RadioGroup, Text} from '@optiaxiom/react';
 import type {ShipVia} from '@shared/types';
-import {useState} from 'react';
+import {useCallback, useState} from 'react';
 
-import {OpenLink} from '../common/OpenLink';
+import {ResultsSummary} from './ResultsSummary';
 import type {PanelProps, Run} from './types';
 
 const NO_WINNER = '__none__';
 
 /** Pick the winner and how it reaches visitors, then end the test. */
 export function EndPanel({
+  context,
   contentRef,
   status,
   run,
@@ -20,6 +21,10 @@ export function EndPanel({
   const {profile} = status.settings;
   const [winner, setWinner] = useState('');
   const [shipVia, setShipVia] = useState<ShipVia | ''>('');
+  // A significant winner in the results is preselected, unless the editor already picked.
+  const onLeader = useCallback((key: string | null) => {
+    if (key) setWinner((current) => current || key);
+  }, []);
   if (!rule) return null;
 
   const cmsStatus = new Map(status.cmsVariations.map((v) => [v.name, v.status]));
@@ -38,9 +43,17 @@ export function EndPanel({
     <Group flexDirection="column" gap="12">
       <Heading level="4">End experiment</Heading>
       <Text color="fg.secondary" fontSize="sm">
-        Check the results in FX first, then pick what visitors should see from now on. The test stops either way.
+        Pick what visitors should see from now on. The test stops either way.
       </Text>
-      {rule.resultsUrl && <OpenLink url={rule.resultsUrl}>View results</OpenLink>}
+      {rule.experimentId && (
+        <ResultsSummary
+          context={context}
+          contentRef={contentRef}
+          controlKey={profile.controlKey}
+          onLeader={onLeader}
+          resultsUrl={rule.resultsUrl}
+        />
+      )}
 
       <Group flexDirection="column" gap="4">
         <Text fontSize="sm" fontWeight="500">Winner</Text>

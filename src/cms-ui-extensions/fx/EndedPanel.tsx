@@ -1,13 +1,14 @@
 import {Alert, Badge, Button, Field, Group, Input, Separator, Text} from '@optiaxiom/react';
 import {useState, type ReactNode} from 'react';
 
-import {OpenLink} from '../common/OpenLink';
+import {ResultsSummary} from './ResultsSummary';
 import type {PanelProps, Run, StatusAction} from './types';
 
 const CONFIRM_WORD = 'delete';
 
 /** An ended experiment: how the winner shipped, cleaning up its variations, archiving the flag. */
 export function EndedPanel({
+  context,
   contentRef,
   status,
   run,
@@ -70,7 +71,14 @@ export function EndedPanel({
           </Group>
         </Alert>
       )}
-      {status.rule?.resultsUrl && <OpenLink appearance="subtle" url={status.rule.resultsUrl}>View results</OpenLink>}
+      {status.rule?.experimentId && (
+        <ResultsSummary
+          context={context}
+          contentRef={contentRef}
+          controlKey={profile.controlKey}
+          resultsUrl={status.rule.resultsUrl}
+        />
+      )}
 
       {candidates.length > 0 && (
         <>

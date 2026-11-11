@@ -17,7 +17,7 @@ export interface PanelProps {
 /** The actions that answer with a fresh StatusResult. */
 export type StatusAction = Exclude<
   ActionName,
-  'listEvents' | 'createEvent' | 'listExperiments' | 'listAudiences' | 'listCmsFlags' | 'forgetLink'
+  'listEvents' | 'createEvent' | 'listExperiments' | 'listAudiences' | 'listCmsFlags' | 'forgetLink' | 'getResults'
 >;
 
 /** Runs one action and applies the status it returns (errors and confirmations are handled by the caller). */

@@ -101,6 +101,7 @@ export const PARSERS: Parsers = {
   },
   listAudiences: none,
   listCmsFlags: none,
+  getResults: (p) => ({content: contentRef(p.content)}),
   createExperiment: (p) => ({
     content: contentRef(p.content),
     displayName: str(p.displayName, 'displayName', {optional: true}),

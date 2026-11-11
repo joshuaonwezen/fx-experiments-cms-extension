@@ -11,6 +11,7 @@ import {
   Deps,
   endExperiment,
   forgetLink,
+  getResults,
   getStatus,
   linkExisting,
   listAudiences,
@@ -51,6 +52,7 @@ const HANDLERS: Handlers = {
   createEvent: (deps, p) => deps.fx.createEvent(p.key, p.name),
   listAudiences: (deps) => listAudiences(deps),
   listCmsFlags: (deps) => listCmsFlags(deps),
+  getResults: (deps, p) => getResults(deps, p.content),
   createExperiment,
   syncVariations,
   removeVariations,
@@ -70,7 +72,14 @@ const HANDLERS: Handlers = {
 
 // Actions that change FX, the CMS or the link store. Each success is logged: the
 // extension context carries no editor identity, so the log records what changed.
-const READ_ONLY = new Set<ActionName>(['getStatus', 'listEvents', 'listAudiences', 'listCmsFlags', 'listExperiments']);
+const READ_ONLY = new Set<ActionName>([
+  'getStatus',
+  'listEvents',
+  'listAudiences',
+  'listCmsFlags',
+  'getResults',
+  'listExperiments',
+]);
 
 function auditFields(params: Record<string, unknown>) {
   const content = params.content as {key?: string; locale?: string} | undefined;

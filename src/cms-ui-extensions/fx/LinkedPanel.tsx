@@ -29,6 +29,7 @@ import {formatPercent, StatusBadge} from '../common/StatusBadge';
 import {EndedPanel} from './EndedPanel';
 import {EndPanel} from './EndPanel';
 import {ReadinessChecklist} from './ReadinessChecklist';
+import {ResultsSummary} from './ResultsSummary';
 import type {PanelProps, StatusAction} from './types';
 
 /** An action the backend wants confirmed, and the flag that confirms it on the retry. */
@@ -204,13 +205,20 @@ export function LinkedPanel(props: PanelProps) {
         >
           {rule.running ? 'Pause experiment' : clashing ? 'Start anyway' : 'Start experiment'}
         </Button>
-        {rule.resultsUrl ? (
-          <OpenLink appearance="default" url={rule.resultsUrl}>View results</OpenLink>
-        ) : (
-          <Text color="fg.secondary" fontSize="xs">FX creates the results page the first time the experiment starts.</Text>
-        )}
         <OpenLink appearance="subtle" url={rule.flagUrl}>Open flag in FX</OpenLink>
       </Group>
+
+      <Separator />
+      {rule.experimentId ? (
+        <ResultsSummary
+          context={context}
+          contentRef={contentRef}
+          controlKey={profile.controlKey}
+          resultsUrl={rule.resultsUrl}
+        />
+      ) : (
+        <Text color="fg.secondary" fontSize="xs">Results appear here once the experiment has started.</Text>
+      )}
 
       <Separator />
       <Table>
