@@ -8,6 +8,12 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 10;
 const EXPIRY_BUFFER_MS = 30_000;
 
+// Reads straight after a publish can still show the old status for a second or two (seen on
+// joshCMS 2026-11-12), so the status is read back a few times before anything is concluded.
+const CONFIRM_DELAYS_MS = [0, 500, 1000, 1500, 2000];
+const PENDING = new Set(['draft', 'ready']);
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export interface CmsConfig {
   clientId: string;
   clientSecret: string;
@@ -148,7 +154,7 @@ export class CmsClient {
   }
 
   /** Publishes the version, or reports that an approval workflow holds it for review. */
-  public async publishVersion(key: string, version: string): Promise<PublishOutcome> {
+  public async publishVersion(key: string, version: string, confirmDelaysMs = CONFIRM_DELAYS_MS): Promise<PublishOutcome> {
     try {
       await this.send('Publish', `/v1/content/${key}/versions/${encodeURIComponent(version)}:publish`, {method: 'POST'});
     } catch (error) {
@@ -158,8 +164,16 @@ export class CmsClient {
       }
       throw error;
     }
-    const after = await this.getVersion(key, version);
-    return after?.status === 'published' ? 'published' : 'awaiting_approval';
+    for (const ms of confirmDelaysMs) {
+      if (ms) await sleep(ms);
+      const status = (await this.getVersion(key, version))?.status;
+      // previous: published, and already replaced by a newer publish.
+      if (status === 'published' || status === 'previous') return 'published';
+      // Anything but a draft (inReview, say) means a workflow holds it.
+      if (status && !PENDING.has(status)) return 'awaiting_approval';
+    }
+    // Still a draft after all the re-reads: say it waits, as before, rather than claim it is live.
+    return 'awaiting_approval';
   }
 
   /** Permanently deletes one version. The CMS refuses the published version and a locale's only version. */
