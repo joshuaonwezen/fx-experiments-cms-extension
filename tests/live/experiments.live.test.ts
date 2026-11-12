@@ -163,7 +163,7 @@ describe.runIf(live && Boolean(content.key) && Boolean(D))('experiment actions (
     status = await setRunning(deps, {content, running: false});
     expect(status.rule?.running).toBe(false);
 
-    const rows = await listExperiments(deps);
+    const {rows} = await listExperiments(deps);
     expect(rows.find((r) => r.link.flagKey === FLAG)?.rule?.flagKey).toBe(FLAG);
 
     // Ship A from FX: the A/B rule stops, a delivery serves the winner.

@@ -30,6 +30,7 @@ import type {
   DeleteCandidate,
   ExperimentLink,
   ExperimentRow,
+  ExperimentsOverview,
   ResultsAnswer,
   RuleSummary,
   RunningExperiment,
@@ -232,10 +233,43 @@ export function deleteCandidates(
     .filter((c) => c.versions.length > 0);
 }
 
+/** Whether a link belongs to `projectId`; 'unknown' for links saved before links recorded it. */
+export function linkProject(link: ExperimentLink, projectId: string): 'own' | 'foreign' | 'unknown' {
+  if (!link.projectId) return 'unknown';
+  return link.projectId === projectId ? 'own' : 'foreign';
+}
+
+/**
+ * The page's experiment in the FX project the app uses now. A link to another project
+ * (the SDK key was changed) is returned as `other`: a flag of the same name in the new
+ * project is a different flag. A link saved before links recorded their project belongs
+ * here when its flag and rule exist here; it is then stamped with the project.
+ */
+async function currentLink(
+  deps: Deps,
+  key: string,
+  locale: string,
+): Promise<{link: ExperimentLink | null; other: ExperimentLink | null}> {
+  const link = await getLink(key, locale);
+  if (!link) return {link: null, other: null};
+  const owner = linkProject(link, deps.fx.projectId);
+  if (owner === 'own') return {link, other: null};
+  if (owner === 'foreign') return {link: null, other: link};
+  try {
+    await loadRule(deps, link);
+  } catch (error) {
+    if (!(error instanceof ActionError)) throw error;
+    if (error.code === 'flag_missing' || error.code === 'rule_missing') return {link: null, other: link};
+  }
+  const adopted = {...link, projectId: deps.fx.projectId};
+  await saveLink(adopted);
+  return {link: adopted, other: null};
+}
+
 export async function getStatus(deps: Deps, ref: ContentRef): Promise<StatusResult> {
   const {profile} = deps;
   const content = await resolveContent(deps, ref);
-  const link = await getLink(content.key, content.locale);
+  const {link, other} = await currentLink(deps, content.key, content.locale);
   const envFx = deps.fx.forEnvironment(link?.environmentKey ?? deps.fx.environmentKey);
   // Informational: a failed lookup shouldn't take the whole panel down.
   const livePromise = liveState(deps, envFx).catch((error: unknown) => {
@@ -277,6 +311,7 @@ export async function getStatus(deps: Deps, ref: ContentRef): Promise<StatusResu
     runningExperiments: live ? live.rules.filter((r) => r.flagKey !== link?.flagKey) : null,
     liveOnSite: link && live?.datafile ? isRuleLive(live.datafile, link.flagKey, link.ruleKey) : null,
     deleteCandidates: link ? deleteCandidates(content, link, armKeys, live?.rules ?? null, paths, profile) : [],
+    otherProjectLink: other ? {flagKey: other.flagKey, displayName: other.displayName} : null,
     settings: {
       projectId: deps.fx.projectId,
       environmentKey: deps.fx.environmentKey,
@@ -356,7 +391,8 @@ export async function createExperiment(deps: Deps, p: CreateExperimentParams): P
   if (!p.variations.length) throw new ActionError('no_variations', 'Pick at least one CMS variation to test.');
 
   const content = await resolveContent(deps, p.content);
-  if (await getLink(content.key, content.locale)) {
+  // A link to another FX project doesn't block: the new link replaces it.
+  if ((await currentLink(deps, content.key, content.locale)).link) {
     throw new ActionError('already_linked', 'This page already has an experiment. Unlink it first.');
   }
   const cmsNames = new Set(content.variations.map((v) => v.name));
@@ -425,6 +461,7 @@ export async function createExperiment(deps: Deps, p: CreateExperimentParams): P
   await saveLink({
     contentKey: content.key,
     locale: content.locale,
+    projectId: fx.projectId,
     flagKey: p.flagKey,
     ruleKey,
     environmentKey: fx.environmentKey,
@@ -445,7 +482,7 @@ interface Linked {
 /** The open page's experiment and its rule; refuses edits once it has ended unless `ended` is allowed. */
 async function requireLinked(deps: Deps, ref: ContentRef, {ended = false} = {}): Promise<Linked> {
   const content = await resolveContent(deps, ref);
-  const link = await getLink(content.key, content.locale);
+  const {link} = await currentLink(deps, content.key, content.locale);
   if (!link) throw new ActionError('not_linked', 'This page has no experiment yet.');
   if (link.conclusion && !ended) {
     throw new ActionError('ended', 'This experiment has ended. Unlink it to start a new one on this page.');
@@ -570,7 +607,8 @@ export async function linkExisting(
 ): Promise<StatusResult> {
   const {fx, profile} = deps;
   const content = await resolveContent(deps, ref);
-  if (await getLink(content.key, content.locale)) {
+  // A link to another FX project doesn't block: the new link replaces it.
+  if ((await currentLink(deps, content.key, content.locale)).link) {
     throw new ActionError('already_linked', 'This page already has an experiment. Unlink it first.');
   }
   const flag = await fx.getFlag(flagKey);
@@ -602,6 +640,7 @@ export async function linkExisting(
   await saveLink({
     contentKey: content.key,
     locale: content.locale,
+    projectId: fx.projectId,
     flagKey,
     ruleKey: chosen,
     environmentKey: fx.environmentKey,
@@ -796,7 +835,7 @@ export async function archiveFlag(deps: Deps, {content: ref}: ActionParams['arch
 /** The open page's experiment results, for the sidebar. A rule FX can't compute yet is a note, not an error. */
 export async function getResults(deps: Deps, ref: ContentRef): Promise<ResultsAnswer> {
   const content = await resolveContent(deps, ref);
-  const link = await getLink(content.key, content.locale);
+  const {link} = await currentLink(deps, content.key, content.locale);
   if (!link) throw new ActionError('not_linked', 'This page has no experiment yet.');
   const {rule, summary} = await loadRule(deps, link);
   if (!summary.experimentId) return {results: null, note: 'Results start once the experiment has started.'};
@@ -836,30 +875,45 @@ export async function listCmsFlags({fx, profile}: Deps): Promise<CmsFlagOption[]
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function listExperiments(deps: Deps): Promise<ExperimentRow[]> {
+export async function listExperiments(deps: Deps): Promise<ExperimentsOverview> {
   const links = await listLinks();
   const rows: ExperimentRow[] = [];
+  const otherProject: ExperimentLink[] = [];
   // A few at a time: each link is three FX calls, and FX rate-limits bursts.
   for (let i = 0; i < links.length; i += 4) {
-    rows.push(
-      ...(await Promise.all(
-        links.slice(i, i + 4).map(async (link) => {
-          if (link.conclusion?.archived) return {link, rule: null, error: null};
-          try {
-            return {link, rule: (await loadRule(deps, link)).summary, error: null};
-          } catch (error) {
-            const message = error instanceof ActionError || error instanceof ApiError ? error.message : 'FX lookup failed.';
-            return {link, rule: null, error: message};
+    await Promise.all(
+      links.slice(i, i + 4).map(async (link) => {
+        const owner = linkProject(link, deps.fx.projectId);
+        if (owner === 'foreign') {
+          otherProject.push(link);
+          return;
+        }
+        if (link.conclusion?.archived && owner === 'own') {
+          rows.push({link, rule: null, error: null});
+          return;
+        }
+        try {
+          const rule = (await loadRule(deps, link)).summary;
+          if (owner === 'unknown') await saveLink({...link, projectId: deps.fx.projectId});
+          rows.push({link, rule, error: null});
+        } catch (error) {
+          // A pre-project link whose flag or rule isn't in this project belongs to another one.
+          if (owner === 'unknown' && error instanceof ActionError && ['flag_missing', 'rule_missing'].includes(error.code)) {
+            otherProject.push(link);
+            return;
           }
-        }),
-      )),
+          const message = error instanceof ActionError || error instanceof ApiError ? error.message : 'FX lookup failed.';
+          rows.push({link, rule: null, error: message});
+        }
+      }),
     );
   }
-  return rows;
+  rows.sort((a, b) => a.link.displayName.localeCompare(b.link.displayName));
+  return {projectId: deps.fx.projectId, environmentKey: deps.fx.environmentKey, rows, otherProject};
 }
 
 /** Removes a link from the Experiments view, e.g. one whose page or flag is gone. Nothing changes in FX. */
-export async function forgetLink(deps: Deps, {contentKey, locale}: ActionParams['forgetLink']): Promise<ExperimentRow[]> {
+export async function forgetLink(deps: Deps, {contentKey, locale}: ActionParams['forgetLink']): Promise<ExperimentsOverview> {
   await removeLink(contentKey, locale);
   return listExperiments(deps);
 }

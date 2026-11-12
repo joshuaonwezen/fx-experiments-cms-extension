@@ -83,6 +83,8 @@ export interface Conclusion {
 export interface ExperimentLink {
   contentKey: string;
   locale: string;
+  /** The FX project the flag lives in. Links saved before this field existed have none. */
+  projectId?: string;
   flagKey: string;
   ruleKey: string;
   environmentKey: string;
@@ -181,6 +183,11 @@ export interface StatusResult {
   liveOnSite: boolean | null;
   /** Variations the cleanup step would delete; only once the experiment has ended. */
   deleteCandidates: DeleteCandidate[];
+  /**
+   * The page's link to an experiment in another FX project (the SDK key changed since).
+   * It isn't this page's experiment any more; the editor can remove it.
+   */
+  otherProjectLink: {flagKey: string; displayName: string} | null;
   settings: {
     projectId: string;
     environmentKey: string;
@@ -208,6 +215,14 @@ export interface ExperimentRow {
   link: ExperimentLink;
   rule: RuleSummary | null;
   error: string | null;
+}
+
+export interface ExperimentsOverview {
+  projectId: string;
+  environmentKey: string;
+  rows: ExperimentRow[];
+  /** Links to experiments in another FX project, hidden from the list. */
+  otherProject: ExperimentLink[];
 }
 
 export interface CmsFlagOption {
@@ -261,8 +276,8 @@ export type ActionResults = {
   endExperiment: StatusResult;
   deleteVariations: StatusResult;
   archiveFlag: StatusResult;
-  listExperiments: ExperimentRow[];
-  forgetLink: ExperimentRow[];
+  listExperiments: ExperimentsOverview;
+  forgetLink: ExperimentsOverview;
 };
 
 export type ActionName = keyof ActionParams;

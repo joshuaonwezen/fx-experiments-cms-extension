@@ -3,7 +3,7 @@ import {describe, expect, it} from 'vitest';
 import {DEFAULT_PROFILE as P} from '../../shared/profile';
 import {CmsClient, CmsItem, CmsVersion, summarizeVersions} from './cms';
 import {Datafile, datafileAudiences, isRuleLive, liveCmsRules} from './datafile';
-import {deleteCandidates, diffVariations, listVersionsOrExplain, promoteVariation} from './experiments';
+import {deleteCandidates, diffVariations, linkProject, listVersionsOrExplain, promoteVariation} from './experiments';
 import {audienceIdsOf, effectiveRoute, FxFlagListItem, runningCmsExperiments} from './fx';
 import {ApiError} from './http';
 
@@ -373,5 +373,19 @@ describe('promoteVariation', () => {
   it('refuses when the winner was never published', async () => {
     const content = {key: 'k', locale: 'en', versions: [{key: 'k', version: '6', locale: 'en', status: 'published'}]};
     await expect(promoteVariation({} as CmsClient, content, 'business')).rejects.toMatchObject({code: 'not_ready'});
+  });
+});
+
+describe('linkProject', () => {
+  const link = {contentKey: 'k', locale: 'en', flagKey: 'f', ruleKey: 'r', environmentKey: 'production', route: '/', displayName: 'P', createdAt: ''};
+
+  it('tells links of this project from links of another one', () => {
+    expect(linkProject({...link, projectId: '1234567890'}, '1234567890')).toBe('own');
+    // The SDK key was changed to another project: a flag of the same name there is a different flag.
+    expect(linkProject({...link, projectId: '1234567890'}, '9999999999')).toBe('foreign');
+  });
+
+  it('marks links saved before links recorded their project as unknown', () => {
+    expect(linkProject(link, '1234567890')).toBe('unknown');
   });
 });

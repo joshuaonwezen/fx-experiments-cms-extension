@@ -36,6 +36,7 @@ function FxExperiment({context}: {context: ExtensionContext}) {
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<FxEvent[] | null>(null);
   const [audiences, setAudiences] = useState<AudienceOption[] | null>(null);
+  const [removingOther, setRemovingOther] = useState(false);
   const requestId = useRef(0);
   const eventsRequested = useRef(false);
   const audiencesRequested = useRef(false);
@@ -170,6 +171,29 @@ function FxExperiment({context}: {context: ExtensionContext}) {
           </Alert>
         )}
         {contentRef && loading && !current && <Spinner />}
+
+        {contentRef && status && current && !status.link && status.otherProjectLink && (
+          <Alert intent="information">
+            <Group flexDirection="column" gap="8">
+              <Text fontSize="sm">
+                This page was linked to <code>{status.otherProjectLink.flagKey}</code> in another Feature Experimentation
+                project. The app now uses project {status.settings.projectId}, so that experiment isn&apos;t shown here.
+              </Text>
+              <Button
+                loading={removingOther}
+                onClick={() => {
+                  setRemovingOther(true);
+                  call(context, 'unlink', {content: contentRef, confirmRunning: true})
+                    .then(setStatus, (e: unknown) => setLoadError(e as Error))
+                    .finally(() => setRemovingOther(false));
+                }}
+                size="sm"
+              >
+                Remove it from this page
+              </Button>
+            </Group>
+          </Alert>
+        )}
 
         {contentRef && status && current && (
           status.link ? (

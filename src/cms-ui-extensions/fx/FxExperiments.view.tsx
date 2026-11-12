@@ -16,7 +16,7 @@ import {
   Text,
 } from '@optiaxiom/react';
 import {register, type ExtensionContext} from '@optimizely/cms-extensibility-sdk';
-import type {CmsFlagOption, ExperimentLink, ExperimentRow} from '@shared/types';
+import type {CmsFlagOption, ExperimentLink, ExperimentsOverview} from '@shared/types';
 import {useCallback, useEffect, useState} from 'react';
 
 import {call, errorMessage} from '../common/api';
@@ -34,7 +34,7 @@ function endedText(link: ExperimentLink): string {
 }
 
 function FxExperiments({context}: {context: ExtensionContext}) {
-  const [rows, setRows] = useState<ExperimentRow[] | null>(null);
+  const [overview, setOverview] = useState<ExperimentsOverview | null>(null);
   const [unlinked, setUnlinked] = useState<CmsFlagOption[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,7 +44,7 @@ function FxExperiments({context}: {context: ExtensionContext}) {
     setLoading(true);
     setError(null);
     try {
-      setRows(await call(context, 'listExperiments', {}));
+      setOverview(await call(context, 'listExperiments', {}));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -78,9 +78,29 @@ function FxExperiments({context}: {context: ExtensionContext}) {
   const setRunning = (link: ExperimentLink, running: boolean) =>
     rowAction(link, () => call(context, 'setRunning', {content: {key: link.contentKey, locale: link.locale}, running}));
   const forget = (link: ExperimentLink) =>
-    rowAction(link, async () => setRows(await call(context, 'forgetLink', {contentKey: link.contentKey, locale: link.locale})));
+    rowAction(link, async () => setOverview(await call(context, 'forgetLink', {contentKey: link.contentKey, locale: link.locale})));
 
+  const rows = overview?.rows ?? null;
+  const otherProject = overview?.otherProject ?? [];
   const running = rows?.filter((r) => r.rule?.running && !r.link.conclusion).length ?? 0;
+
+  // Links to experiments in another FX project (the SDK key changed since): not this
+  // project's experiments, so they're hidden and can be removed in one go.
+  const forgetOtherProject = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      let next: ExperimentsOverview | null = null;
+      for (const link of otherProject) {
+        next = await call(context, 'forgetLink', {contentKey: link.contentKey, locale: link.locale});
+      }
+      if (next) setOverview(next);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Box p="24">
@@ -92,11 +112,30 @@ function FxExperiments({context}: {context: ExtensionContext}) {
               Pages whose CMS variations are in a Feature Experimentation A/B test
               {rows ? ` · ${rows.length} linked, ${running} running` : ''}.
             </Text>
+            {overview && (
+              <Text color="fg.tertiary" fontSize="xs">
+                Feature Experimentation project {overview.projectId} · {overview.environmentKey}
+              </Text>
+            )}
           </Group>
           <Button loading={loading} onClick={() => void load()}>Refresh</Button>
         </Group>
 
         {error && <Alert intent="danger">{error}</Alert>}
+        {otherProject.length > 0 && (
+          <Alert intent="information">
+            <Group alignItems="center" gap="8" justifyContent="space-between">
+              <Text fontSize="sm">
+                {otherProject.length === 1 ? '1 page is' : `${otherProject.length} pages are`} still linked to an
+                experiment in another Feature Experimentation project, so {otherProject.length === 1 ? 'it is' : 'they are'}{' '}
+                hidden here.
+              </Text>
+              <Button loading={loading} onClick={() => void forgetOtherProject()} size="sm">
+                Remove {otherProject.length === 1 ? 'it' : 'them'}
+              </Button>
+            </Group>
+          </Alert>
+        )}
         {!rows && !error && <Spinner />}
         {rows && rows.length === 0 && (
           <Alert intent="information">
