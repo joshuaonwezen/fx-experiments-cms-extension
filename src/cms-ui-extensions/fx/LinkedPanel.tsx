@@ -336,7 +336,7 @@ export function LinkedPanel(props: PanelProps) {
         <Disclosure>
           <DisclosureTrigger>
             <Text fontSize="sm" fontWeight="600">
-              Settings: traffic, audience, metrics, URLs
+              Settings: traffic, audiences, metrics, URLs
             </Text>
           </DisclosureTrigger>
           <DisclosureContent>
@@ -356,7 +356,7 @@ export function LinkedPanel(props: PanelProps) {
 
               <Group flexDirection="column" gap="4">
                 <Text fontSize="sm" fontWeight="500">
-                  Audience
+                  Audiences
                 </Text>
                 <AudiencePicker audiences={audiences} onChange={setAudienceIds} selected={audienceIds} />
                 {audiencesDirty && (
@@ -365,7 +365,7 @@ export function LinkedPanel(props: PanelProps) {
                     onClick={() => void run('setAudiences', {content: contentRef, audienceIds})}
                     size="sm"
                   >
-                    Save audience
+                    Save audiences
                   </Button>
                 )}
               </Group>

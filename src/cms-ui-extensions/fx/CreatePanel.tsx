@@ -173,14 +173,14 @@ export function CreatePanel(props: PanelProps) {
 
       <div className="ui-card">
         <div className="ui-card-title">
-          <span>2. What counts as success</span>
+          <span>2. Metrics</span>
         </div>
         <MetricPicker events={events} onChange={setEventIds} onCreateEvent={createEvent} selected={eventIds} />
       </div>
 
       <div className="ui-card">
         <div className="ui-card-title">
-          <span>3. Who takes part</span>
+          <span>3. Audiences</span>
         </div>
         <AudiencePicker audiences={audiences} onChange={setAudienceIds} selected={audienceIds} />
         <Field description="Share of those visitors who enter the test." error={trafficError} label="Traffic (%)">

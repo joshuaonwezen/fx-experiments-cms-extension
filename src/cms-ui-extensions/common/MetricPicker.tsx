@@ -82,8 +82,8 @@ export function MetricPicker({
       )}
 
       <SearchInput onChange={(e) => setFilter(e.target.value)} placeholder="Filter events…" value={filter} />
-      <Box style={{maxHeight: 200, overflowY: 'auto'}}>
-        <Group flexDirection="column" gap="4">
+      <Box className="ui-scroll" style={{maxHeight: 200}}>
+        <Group flexDirection="column" gap="6">
           {visible.map((e) => (
             <Checkbox
               checked={selected.includes(e.id)}

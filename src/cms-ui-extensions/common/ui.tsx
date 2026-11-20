@@ -119,6 +119,10 @@ export const STYLE = `
 .ui-table[data-compact] th:last-child, .ui-table[data-compact] td:last-child { padding-right: 0; }
 .ui-table[data-compact] tbody tr:last-child td { border-bottom: 0; }
 .ui-tag { font-size: 11px; line-height: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; color: var(--ui-ink-3); }
+.ui-scroll {
+  overflow-y: auto; padding: 8px 10px; margin-top: 4px;
+  border: 1px solid var(--ui-line); border-radius: 8px; background: var(--ui-surface);
+}
 .ui-select {
   flex: 1; min-width: 0; font: inherit; font-size: 13px; line-height: 18px; color: var(--ui-ink);
   padding: 5px 8px; border: 1px solid var(--ui-line-strong); border-radius: 6px; background: var(--ui-surface);

@@ -41,8 +41,8 @@ export function AudiencePicker({
       {audiences.length > 8 && (
         <SearchInput onChange={(e) => setFilter(e.target.value)} placeholder="Filter audiences…" value={filter} />
       )}
-      <Box style={{maxHeight: 180, overflowY: 'auto'}}>
-        <Group flexDirection="column" gap="4">
+      <Box className="ui-scroll" style={{maxHeight: 180}}>
+        <Group flexDirection="column" gap="6">
           {visible.map((a) => (
             <Checkbox checked={selected.includes(a.id)} key={a.id} onChange={() => toggle(a.id)} size="sm">
               {a.name}
