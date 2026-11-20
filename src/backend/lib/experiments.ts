@@ -48,7 +48,11 @@ import {storedKeys} from './validate';
 
 export {ActionError};
 
-const CONTROL_NAME = 'Control (original page)';
+// Names match the site's FX and WX projects: a control's name starts with "Control:",
+// and a rule made here is "CMS: <page>" with no number, so it stands apart from the
+// numbered "EXP-<n>: ..." experiments built in code.
+const CONTROL_NAME = 'Control: base page';
+const ruleName = (flagName: string) => `CMS: ${flagName}`;
 
 export interface Deps {
   fx: FxClient;
@@ -447,7 +451,7 @@ export async function createExperiment(deps: Deps, p: CreateExperimentParams): P
   const ruleset = await fx.getRuleset(p.flagKey);
   const previous = ruleset.rules[ruleKey];
   if (!previous) {
-    await fx.addAbRule(p.flagKey, ruleKey, `${p.flagName || p.flagKey} experiment`, arms, metrics, p.trafficPercent, p.audienceIds);
+    await fx.addAbRule(p.flagKey, ruleKey, ruleName(p.flagName || p.flagKey), arms, metrics, p.trafficPercent, p.audienceIds);
   } else {
     // A retry with a different pick: make the rule match this request, not the last one.
     const current = Object.keys(previous.variations ?? {}).sort().join(',');

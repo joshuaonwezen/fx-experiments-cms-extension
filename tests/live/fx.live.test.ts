@@ -44,7 +44,7 @@ describe.runIf(live)('FX lifecycle (live)', () => {
     const initial = (await fx.listVariations(FLAG)).map((v) => v.key).sort();
     console.log('initial variations', initial);
 
-    await fx.createVariation(FLAG, CONTROL_VARIATION_KEY, 'Control (original page)');
+    await fx.createVariation(FLAG, CONTROL_VARIATION_KEY, 'Control: base page');
     await fx.createVariation(FLAG, 'smoke_a', 'smoke_a');
     const variations = await fx.listVariations(FLAG);
     console.log('variation variables', JSON.stringify(variations.find((v) => v.key === 'smoke_a')?.variables));
@@ -76,7 +76,7 @@ describe.runIf(live)('FX lifecycle (live)', () => {
     await fx.createVariation(FLAG, 'smoke_b', 'smoke_b');
     // A custom 60/40 split keeps its shape when an arm is added.
     ruleset = await fx.setRuleArms(FLAG, RULE, [
-      {key: CONTROL_VARIATION_KEY, name: 'Control (original page)', weight: 6000},
+      {key: CONTROL_VARIATION_KEY, name: 'Control: base page', weight: 6000},
       {key: 'smoke_a', name: 'smoke_a', weight: 4000},
     ]);
     const arms = addArms(
