@@ -1,10 +1,12 @@
-import {Alert, AxiomProvider, Box, Button, Group, Heading, Spinner, Text} from '@optiaxiom/react';
+import {Alert, Button, Group, Text} from '@optiaxiom/react';
 import {register, type ContentState, type ExtensionContext} from '@optimizely/cms-extensibility-sdk';
 import {normalizeKey} from '@shared/experiment';
 import type {AudienceOption, ContentRef, FxEvent, StatusResult} from '@shared/types';
 import {useCallback, useEffect, useRef, useState} from 'react';
 
 import {call, CallError, errorMessage} from '../common/api';
+import {Frame} from '../common/Frame';
+import {Code} from '../common/ui';
 import {CreatePanel} from './CreatePanel';
 import {LinkedPanel} from './LinkedPanel';
 
@@ -135,103 +137,108 @@ function FxExperiment({context}: {context: ExtensionContext}) {
     status && contentRef && status.content.key === normalizeKey(contentRef.key) &&
     (!contentRef.locale || status.content.locale === contentRef.locale);
 
+  const subtitle =
+    current && status ? (
+      editing ? (
+        <>
+          Editing variation <Code>{editing}</Code>
+        </>
+      ) : (
+        'Editing the original page'
+      )
+    ) : undefined;
+  const refreshButton =
+    current && status ? (
+      <Button appearance="subtle" disabled={loading} onClick={onRefresh} size="sm">
+        Refresh
+      </Button>
+    ) : undefined;
+
+  if (!contentRef) {
+    return (
+      <Frame>
+        <Text color="fg.secondary">Open a page to set up its experiment.</Text>
+      </Frame>
+    );
+  }
+
   return (
-    <Box p="12">
-      <Group flexDirection="column" gap="12">
-        {current && status && (
-          <Group alignItems="center" justifyContent="space-between">
-            <Heading level="4">{status.content.displayName}</Heading>
-            {loading && <Spinner size="sm" />}
-          </Group>
-        )}
-        {current && status && (
-          <Text color="fg.secondary" fontSize="sm">
-            {editing ? (
-              <>
-                Editing variation <code>{editing}</code>
-              </>
-            ) : (
-              'Editing the original page'
+    <Frame
+      actions={refreshButton}
+      busy={loading}
+      heading={current && status ? status.content.displayName : undefined}
+      subtitle={subtitle}
+    >
+      {loadError && (
+        <Alert intent={alertIntent(loadError)}>
+          <Group flexDirection="column" gap="8">
+            <Text fontSize="sm">{errorMessage(loadError)}</Text>
+            {errorCode(loadError) === 'not_configured' && (
+              <Text fontSize="sm">Fill these in on the Feature Experimentation app&apos;s settings page.</Text>
             )}
-          </Text>
-        )}
-
-        {!contentRef && <Text color="fg.secondary">Open a page to set up its experiment.</Text>}
-        {loadError && (
-          <Alert intent={alertIntent(loadError)}>
-            <Group flexDirection="column" gap="8">
-              <Text fontSize="sm">{errorMessage(loadError)}</Text>
-              {errorCode(loadError) === 'not_configured' && (
-                <Text fontSize="sm">Fill these in on the Feature Experimentation app&apos;s settings page.</Text>
-              )}
-              {errorCode(loadError) !== 'unsupported_content' && (
-                <Button onClick={onRefresh} size="sm">Retry</Button>
-              )}
-            </Group>
-          </Alert>
-        )}
-        {contentRef && loading && !current && <Spinner />}
-
-        {contentRef && status && current && !status.link && status.otherProjectLink && (
-          <Alert intent="information">
-            <Group flexDirection="column" gap="8">
-              <Text fontSize="sm">
-                This page was linked to <code>{status.otherProjectLink.flagKey}</code> in another Feature Experimentation
-                project. The app now uses project {status.settings.projectId}, so that experiment isn&apos;t shown here.
-              </Text>
-              <Button
-                loading={removingOther}
-                onClick={() => {
-                  setRemovingOther(true);
-                  call(context, 'unlink', {content: contentRef, confirmRunning: true})
-                    .then(setStatus, (e: unknown) => setLoadError(e as Error))
-                    .finally(() => setRemovingOther(false));
-                }}
-                size="sm"
-              >
-                Remove it from this page
+            {errorCode(loadError) !== 'unsupported_content' && (
+              <Button onClick={onRefresh} size="sm">
+                Retry
               </Button>
-            </Group>
-          </Alert>
-        )}
+            )}
+          </Group>
+        </Alert>
+      )}
 
-        {contentRef && status && current && (
-          status.link ? (
-            <LinkedPanel
-              audiences={audiences}
-              context={context}
-              contentRef={contentRef}
-              createEvent={createEvent}
-              events={events}
-              loadAudiences={loadAudiences}
-              loadEvents={loadEvents}
-              onRefresh={onRefresh}
-              onStatus={setStatus}
-              status={status}
-            />
-          ) : (
-            <CreatePanel
-              audiences={audiences}
-              context={context}
-              contentRef={contentRef}
-              createEvent={createEvent}
-              events={events}
-              key={`${status.content.key}:${status.content.locale}`}
-              loadAudiences={loadAudiences}
-              loadEvents={loadEvents}
-              onRefresh={onRefresh}
-              onStatus={setStatus}
-              status={status}
-            />
-          )
-        )}
-      </Group>
-    </Box>
+      {status && current && !status.link && status.otherProjectLink && (
+        <Alert intent="information">
+          <Group flexDirection="column" gap="8">
+            <Text fontSize="sm">
+              This page was linked to <Code>{status.otherProjectLink.flagKey}</Code> in another Feature Experimentation
+              project. The app now uses project {status.settings.projectId}, so that experiment isn&apos;t shown here.
+            </Text>
+            <Button
+              loading={removingOther}
+              onClick={() => {
+                setRemovingOther(true);
+                call(context, 'unlink', {content: contentRef, confirmRunning: true})
+                  .then(setStatus, (e: unknown) => setLoadError(e as Error))
+                  .finally(() => setRemovingOther(false));
+              }}
+              size="sm"
+            >
+              Remove it from this page
+            </Button>
+          </Group>
+        </Alert>
+      )}
+
+      {status && current &&
+        (status.link ? (
+          <LinkedPanel
+            audiences={audiences}
+            context={context}
+            contentRef={contentRef}
+            createEvent={createEvent}
+            events={events}
+            loadAudiences={loadAudiences}
+            loadEvents={loadEvents}
+            onRefresh={onRefresh}
+            onStatus={setStatus}
+            status={status}
+          />
+        ) : (
+          <CreatePanel
+            audiences={audiences}
+            context={context}
+            contentRef={contentRef}
+            createEvent={createEvent}
+            events={events}
+            key={`${status.content.key}:${status.content.locale}`}
+            loadAudiences={loadAudiences}
+            loadEvents={loadEvents}
+            onRefresh={onRefresh}
+            onStatus={setStatus}
+            status={status}
+          />
+        ))}
+    </Frame>
   );
 }
 
-register((context) => (
-  <AxiomProvider>
-    <FxExperiment context={context} />
-  </AxiomProvider>
-));
+register((context) => <FxExperiment context={context} />);

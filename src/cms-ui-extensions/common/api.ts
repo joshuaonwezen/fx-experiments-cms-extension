@@ -45,3 +45,12 @@ export async function call<A extends ActionName>(
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Request failed.';
 }
+
+// Errors only a CMS admin can fix (app settings): a warning rather than an error.
+export function needsAdmin(error: unknown): boolean {
+  return error instanceof CallError && error.code === 'not_configured';
+}
+
+export function isNotConfigured(error: unknown): boolean {
+  return error instanceof CallError && error.code === 'not_configured';
+}

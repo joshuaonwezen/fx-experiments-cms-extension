@@ -18,10 +18,13 @@ winner when it ends. Walkthrough: [Feature Experimentation extension](https://op
 ## Running a test
 
 1. Pick the variations, the metric, and who takes part.
-2. Check the list under the form: the page and its variations must be published before the test can start.
+2. Check **Before it starts** under the form: the page and its variations must be published before the test can start.
 3. Start it. The panel says when the test is live on the site.
 4. When the results are in, choose **End experiment**, pick the winner, and either serve it from FX or make it the
    page in the CMS. Then delete the variations you no longer need.
+
+The links to FX (the flag, the full results) and the variation previews copy themselves when clicked, because the CMS
+doesn't let extensions open new tabs: paste the link into a new tab, or right-click it and choose Open link in new tab.
 
 ## What your site needs
 

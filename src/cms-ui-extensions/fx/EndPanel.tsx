@@ -1,4 +1,4 @@
-import {Alert, Button, Group, Heading, Radio, RadioGroup, Text} from '@optiaxiom/react';
+import {Alert, Button, Group, Radio, RadioGroup, Text} from '@optiaxiom/react';
 import type {ShipVia} from '@shared/types';
 import {useCallback, useState} from 'react';
 
@@ -40,8 +40,10 @@ export function EndPanel({
     });
 
   return (
-    <Group flexDirection="column" gap="12">
-      <Heading level="4">End experiment</Heading>
+    <div className="ui-card" style={{gap: 12}}>
+      <div className="ui-card-title">
+        <span>End experiment</span>
+      </div>
       <Text color="fg.secondary" fontSize="sm">
         Pick what visitors should see from now on. The test stops either way.
       </Text>
@@ -103,6 +105,6 @@ export function EndPanel({
         </Button>
         <Button appearance="subtle" onClick={onCancel}>Cancel</Button>
       </Group>
-    </Group>
+    </div>
   );
 }

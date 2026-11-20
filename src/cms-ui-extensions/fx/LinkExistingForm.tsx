@@ -1,4 +1,4 @@
-import {Alert, Button, Field, Group, Heading, Select, SelectContent, SelectTrigger, Spinner, Text} from '@optiaxiom/react';
+import {Alert, Button, Field, Group, Select, SelectContent, SelectTrigger, Spinner, Text} from '@optiaxiom/react';
 import type {CmsFlagOption} from '@shared/types';
 import {useEffect, useState} from 'react';
 
@@ -43,8 +43,10 @@ export function LinkExistingForm({context, contentRef, status, onStatus, onCance
   };
 
   return (
-    <Group flexDirection="column" gap="12">
-      <Heading level="4">Link an existing flag</Heading>
+    <div className="ui-card" style={{gap: 12}}>
+      <div className="ui-card-title">
+        <span>Link an existing flag</span>
+      </div>
       <Text color="fg.secondary" fontSize="sm">
         For a test already set up in Feature Experimentation. Nothing in FX changes.
       </Text>
@@ -90,6 +92,6 @@ export function LinkExistingForm({context, contentRef, status, onStatus, onCance
         </Button>
         <Button appearance="subtle" onClick={onCancel}>Back</Button>
       </Group>
-    </Group>
+    </div>
   );
 }

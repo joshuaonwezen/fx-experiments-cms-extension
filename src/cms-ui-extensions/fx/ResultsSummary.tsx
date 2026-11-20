@@ -1,4 +1,4 @@
-import {Button, Group, Spinner, Text} from '@optiaxiom/react';
+import {Button, Group, Spinner} from '@optiaxiom/react';
 import type {ExtensionContext} from '@optimizely/cms-extensibility-sdk';
 import type {ContentRef, ExperimentResults} from '@shared/types';
 import {useCallback, useEffect, useState} from 'react';
@@ -49,21 +49,21 @@ export function ResultsSummary({
 
   return (
     <Group flexDirection="column" gap="8">
-      <Group alignItems="center" justifyContent="space-between">
-        <Text fontSize="sm" fontWeight="500">
-          Results{results ? `: ${results.metric}` : ''}
-        </Text>
+      <div className="ui-card-title">
+        <span>Results{results ? `: ${results.metric}` : ''}</span>
         <Button appearance="subtle" loading={loading} onClick={() => void load()} size="sm">
           Refresh
         </Button>
-      </Group>
+      </div>
       {loading && !results && !note && <Spinner size="sm" />}
-      {note && <Text color="fg.secondary" fontSize="sm">{note}</Text>}
+      {note && <span className="ui-muted ui-small">{note}</span>}
       {results && <ResultsTable controlKey={controlKey} results={results} />}
       {resultsUrl && (
-        <OpenLink appearance="subtle" url={resultsUrl}>
-          Full results in FX
-        </OpenLink>
+        <div>
+          <OpenLink appearance="subtle" size="sm" url={resultsUrl}>
+            Full results in FX
+          </OpenLink>
+        </div>
       )}
     </Group>
   );

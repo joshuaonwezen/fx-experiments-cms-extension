@@ -8,7 +8,6 @@ import {
   Field,
   Group,
   Input,
-  Separator,
   Switch,
   Text,
 } from '@optiaxiom/react';
@@ -20,6 +19,7 @@ import {AudiencePicker} from '../common/AudiencePicker';
 import {call, errorMessage} from '../common/api';
 import {MetricPicker} from '../common/MetricPicker';
 import {formatPercent} from '../common/StatusBadge';
+import {Code} from '../common/ui';
 import {LinkExistingForm} from './LinkExistingForm';
 import {ReadinessChecklist} from './ReadinessChecklist';
 import type {PanelProps} from './types';
@@ -66,14 +66,17 @@ export function CreatePanel(props: PanelProps) {
         <Alert intent="information">
           <Text fontSize="sm">
             This page has no variations yet. Add one from the editor&apos;s Variations menu and give it a short name
-            such as <code>business</code>, then refresh.
+            such as <Code>business</Code>, then refresh.
           </Text>
         </Alert>
-        <Button onClick={onRefresh}>Refresh</Button>
-        <Separator />
-        <Button appearance="subtle" onClick={() => setLinking(true)}>
-          Link an existing flag instead
-        </Button>
+        <Group gap="8">
+          <Button onClick={onRefresh} size="sm">
+            Refresh
+          </Button>
+          <Button appearance="subtle" onClick={() => setLinking(true)} size="sm">
+            Link an existing flag instead
+          </Button>
+        </Group>
       </Group>
     );
   }
@@ -132,8 +135,10 @@ export function CreatePanel(props: PanelProps) {
         Experimentation measures which one does best.
       </Text>
 
-      <Group flexDirection="column" gap="4">
-        <Text fontSize="sm" fontWeight="500">1. Variations to test</Text>
+      <div className="ui-card">
+        <div className="ui-card-title">
+          <span>1. Variations to test</span>
+        </div>
         <Checkbox checked description="Visitors who see the page unchanged" disabled size="sm">
           Original page
         </Checkbox>
@@ -155,34 +160,43 @@ export function CreatePanel(props: PanelProps) {
           </Checkbox>
         ))}
         {status.diff.invalid.map((i) => (
-          <Text color="fg.warning" fontSize="xs" key={i.name}>
-            {i.name}: {i.reason}
-          </Text>
+          <span className="ui-small" key={i.name} style={{color: 'var(--ui-warn-text)'}}>
+            <Code>{i.name}</Code> {i.reason}
+          </span>
         ))}
         {chosen.length > 0 && (
-          <Text color="fg.secondary" fontSize="xs">
+          <span className="ui-faint ui-small">
             Each gets {arms.map((a) => `${a.key === profile.controlKey ? 'original' : a.key} ${formatPercent(a.weight / 100)}`).join(' · ')}
-          </Text>
+          </span>
         )}
-      </Group>
+      </div>
 
-      <Group flexDirection="column" gap="4">
-        <Text fontSize="sm" fontWeight="500">2. What counts as success</Text>
+      <div className="ui-card">
+        <div className="ui-card-title">
+          <span>2. What counts as success</span>
+        </div>
         <MetricPicker events={events} onChange={setEventIds} onCreateEvent={createEvent} selected={eventIds} />
-      </Group>
+      </div>
 
-      <Group flexDirection="column" gap="4">
-        <Text fontSize="sm" fontWeight="500">3. Who takes part</Text>
+      <div className="ui-card">
+        <div className="ui-card-title">
+          <span>3. Who takes part</span>
+        </div>
         <AudiencePicker audiences={audiences} onChange={setAudienceIds} selected={audienceIds} />
         <Field description="Share of those visitors who enter the test." error={trafficError} label="Traffic (%)">
           <Input max={100} min={1} onChange={(e) => setTraffic(e.target.value)} type="number" value={traffic} />
         </Field>
-      </Group>
+      </div>
 
+      <div className="ui-card" data-folded="">
       <Disclosure onOpenChange={setAdvancedOpen} open={advancedOpen}>
-        <DisclosureTrigger>Advanced: flag and URLs</DisclosureTrigger>
+        <DisclosureTrigger>
+          <Text fontSize="sm" fontWeight="600">
+            Advanced: flag and URLs
+          </Text>
+        </DisclosureTrigger>
         <DisclosureContent>
-          <Group flexDirection="column" gap="12" pt="8">
+          <Group flexDirection="column" gap="12" pb="8" pl="12" pr="8" pt="4">
             <Field error={flagError} label="Flag key" required>
               <Input onChange={(e) => setFlagKey(e.target.value.trim())} value={flagKey} />
             </Field>
@@ -200,11 +214,18 @@ export function CreatePanel(props: PanelProps) {
           </Group>
         </DisclosureContent>
       </Disclosure>
+      </div>
 
-      <ReadinessChecklist
-        items={items}
-        onFixRoute={missingPaths.length > 0 ? () => setRoute(withPaths(route, status.content.visitorPaths)) : undefined}
-      />
+      <div className="ui-card">
+        <div className="ui-card-title">
+          <span>Before it starts</span>
+          <span className="ui-faint ui-small">{blocked.length === 0 ? 'ready' : `${blocked.length} to fix`}</span>
+        </div>
+        <ReadinessChecklist
+          items={items}
+          onFixRoute={missingPaths.length > 0 ? () => setRoute(withPaths(route, status.content.visitorPaths)) : undefined}
+        />
+      </div>
       <Switch checked={start} disabled={blocked.length > 0} onCheckedChange={setStart}>
         Start the experiment now
       </Switch>
@@ -214,10 +235,11 @@ export function CreatePanel(props: PanelProps) {
         {start && clashing ? 'Create and start anyway' : start ? 'Create and start' : 'Create experiment'}
       </Button>
 
-      <Separator />
-      <Button appearance="subtle" onClick={() => setLinking(true)}>
-        Link an existing flag instead
-      </Button>
+      <div>
+        <Button appearance="subtle" onClick={() => setLinking(true)} size="sm">
+          Link an existing flag instead
+        </Button>
+      </div>
     </Group>
   );
 }

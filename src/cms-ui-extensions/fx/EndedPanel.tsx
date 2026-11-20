@@ -1,10 +1,13 @@
-import {Alert, Badge, Button, Field, Group, Input, Separator, Text} from '@optiaxiom/react';
+import {Alert, Button, Field, Group, Input, Text} from '@optiaxiom/react';
 import {useState, type ReactNode} from 'react';
 
+import {Chip, Code} from '../common/ui';
 import {ResultsSummary} from './ResultsSummary';
 import type {PanelProps, Run, StatusAction} from './types';
 
 const CONFIRM_WORD = 'delete';
+
+const DAY = new Intl.DateTimeFormat('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
 
 /** An ended experiment: how the winner shipped, cleaning up its variations, archiving the flag. */
 export function EndedPanel({
@@ -38,10 +41,11 @@ export function EndedPanel({
 
   return (
     <Group flexDirection="column" gap="12">
-      <Group alignItems="center" gap="8">
-        <Badge intent="information" variant="subtle">ended</Badge>
-        <Text color="fg.secondary" fontSize="xs">{new Date(ended.endedAt).toLocaleDateString()}</Text>
-      </Group>
+      <div className="ui-card">
+      <div className="ui-card-title">
+        <Chip icon="check" label="Ended" state="draft" />
+        <span className="ui-faint ui-small">{DAY.format(new Date(ended.endedAt))}</span>
+      </div>
 
       {original && (
         <Text fontSize="sm">
@@ -50,19 +54,19 @@ export function EndedPanel({
       )}
       {!original && ended.shipVia === 'fx' && (
         <Text fontSize="sm">
-          <b>{winner}</b> won. FX serves it to everyone through the rule <code>{ended.deliveryRuleKey}</code>.
+          <Code>{winner}</Code> won. FX serves it to everyone through the rule <Code>{ended.deliveryRuleKey}</Code>.
         </Text>
       )}
       {!original && ended.shipVia === 'cms' && ended.promotion === 'published' && (
         <Text fontSize="sm">
-          <b>{winner}</b> won and is now the published page.
+          <Code>{winner}</Code> won and is now the published page.
         </Text>
       )}
       {!original && ended.shipVia === 'cms' && ended.promotion !== 'published' && (
         <Alert intent="warning">
           <Group flexDirection="column" gap="8">
             <Text fontSize="sm">
-              <b>{winner}</b> won. Its content is in a new version of the page that still needs approval in the CMS.
+              <Code>{winner}</Code> won. Its content is in a new version of the page that still needs approval in the CMS.
               Visitors see the original page until it is published.
             </Text>
             <Button loading={busy === 'endExperiment'} onClick={resume} size="sm">
@@ -71,19 +75,23 @@ export function EndedPanel({
           </Group>
         </Alert>
       )}
+      </div>
       {status.rule?.experimentId && (
+        <div className="ui-card">
         <ResultsSummary
           context={context}
           contentRef={contentRef}
           controlKey={profile.controlKey}
           resultsUrl={status.rule.resultsUrl}
         />
+        </div>
       )}
 
       {candidates.length > 0 && (
-        <>
-          <Separator />
-          <Text fontSize="sm" fontWeight="500">Clean up the CMS</Text>
+        <div className="ui-card">
+          <div className="ui-card-title">
+            <span>Clean up the CMS</span>
+          </div>
           <Text fontSize="sm">
             No longer needed: {candidates.map((c) => c.name).join(', ')} ({versionCount}{' '}
             {versionCount === 1 ? 'version' : 'versions'}). Nothing else on this page uses{' '}
@@ -112,7 +120,7 @@ export function EndedPanel({
               Delete them in the editor, or ask an admin to let this extension delete variations (app settings).
             </Text>
           )}
-        </>
+        </div>
       )}
       {(ended.notDeleted?.length ?? 0) > 0 && (
         <Alert intent="warning">
@@ -134,17 +142,12 @@ export function EndedPanel({
 
       {confirmAlert}
       {error && <Alert intent="danger">{error}</Alert>}
-      <Separator />
-      {ended.archived ? (
-        <Text color="fg.secondary" fontSize="sm">The flag is archived in FX.</Text>
-      ) : ended.shipVia !== 'fx' && !archiving ? (
-        <Button appearance="subtle" onClick={() => setArchiving(true)}>Archive the flag in FX</Button>
-      ) : null}
+      {ended.archived && <span className="ui-muted ui-small">The flag is archived in FX.</span>}
       {archiving && !ended.archived && (
         <Alert intent="warning">
           <Group flexDirection="column" gap="8">
             <Text fontSize="sm">
-              Archives <code>{status.link.flagKey}</code> in every environment. Its results stay in FX.
+              Archives <Code>{status.link.flagKey}</Code> in every environment. Its results stay in FX.
             </Text>
             <Group gap="8">
               <Button
@@ -160,10 +163,17 @@ export function EndedPanel({
           </Group>
         </Alert>
       )}
-      <Text color="fg.secondary" fontSize="xs">
-        Unlink to run a new experiment on this page. The flag and its results stay in FX.
-      </Text>
-      {unlinkButton}
+      <Group flexDirection="column" gap="4">
+        <Group flexWrap="wrap" gap="8">
+          {!ended.archived && ended.shipVia !== 'fx' && !archiving && (
+            <Button appearance="subtle" onClick={() => setArchiving(true)} size="sm">
+              Archive the flag in FX
+            </Button>
+          )}
+          {unlinkButton}
+        </Group>
+        <span className="ui-faint ui-small">Unlink to run a new experiment on this page. The flag and its results stay in FX.</span>
+      </Group>
     </Group>
   );
 }

@@ -1,20 +1,4 @@
-import {
-  Alert,
-  AxiomProvider,
-  Badge,
-  Box,
-  Button,
-  Group,
-  Heading,
-  Spinner,
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableHeaderCell,
-  TableRow,
-  Text,
-} from '@optiaxiom/react';
+import {Alert, AxiomProvider, Box, Button, Group, Spinner, Text} from '@optiaxiom/react';
 import {register, type ExtensionContext} from '@optimizely/cms-extensibility-sdk';
 import type {CmsFlagOption, ExperimentLink, ExperimentsOverview} from '@shared/types';
 import {useCallback, useEffect, useState} from 'react';
@@ -22,6 +6,7 @@ import {useCallback, useEffect, useState} from 'react';
 import {call, errorMessage} from '../common/api';
 import {OpenLink} from '../common/OpenLink';
 import {formatPercent, StatusBadge} from '../common/StatusBadge';
+import {Chip, Code, count, Icon, STYLE, type ChipState, type IconName} from '../common/ui';
 
 const rowKey = (link: ExperimentLink) => `${link.contentKey}:${link.locale}`;
 
@@ -102,23 +87,32 @@ function FxExperiments({context}: {context: ExtensionContext}) {
     }
   };
 
+  const paused = rows?.filter((r) => r.rule && !r.rule.running && !r.link.conclusion).length ?? 0;
+  const ended = rows?.filter((r) => r.link.conclusion).length ?? 0;
+  const tiles: Array<{label: string; n: number; state: ChipState; icon: IconName}> = [
+    {label: 'Linked pages', n: rows?.length ?? 0, state: 'draft', icon: 'arrow'},
+    {label: 'Running', n: running, state: 'good', icon: 'play'},
+    {label: 'Paused or not started', n: paused, state: 'warn', icon: 'pause'},
+    {label: 'Ended', n: ended, state: 'neutral', icon: 'check'},
+  ];
+
   return (
-    <Box p="24">
-      <Group flexDirection="column" gap="16">
-        <Group alignItems="center" justifyContent="space-between">
+    <Box className="ui" p="24">
+      <style>{STYLE}</style>
+      <Group flexDirection="column" gap="20">
+        <Group alignItems="start" gap="16" justifyContent="space-between">
           <Group flexDirection="column" gap="4">
-            <Heading level="2">Experiments</Heading>
-            <Text color="fg.secondary">
-              Pages whose CMS variations are in a Feature Experimentation A/B test
-              {rows ? ` · ${rows.length} linked, ${running} running` : ''}.
+            <Text fontSize="lg" fontWeight="600">
+              {rows ? `${count(rows.length, 'page')} in an experiment` : 'Experiments'}
             </Text>
-            {overview && (
-              <Text color="fg.tertiary" fontSize="xs">
-                Feature Experimentation project {overview.projectId} · {overview.environmentKey}
-              </Text>
-            )}
+            <Text color="fg.secondary" fontSize="sm">
+              Pages whose CMS variations are in a Feature Experimentation A/B test
+              {overview ? ` · project ${overview.projectId}, ${overview.environmentKey}` : ''}.
+            </Text>
           </Group>
-          <Button loading={loading} onClick={() => void load()}>Refresh</Button>
+          <Button appearance="subtle" loading={loading} onClick={() => void load()} size="sm">
+            Refresh
+          </Button>
         </Group>
 
         {error && <Alert intent="danger">{error}</Alert>}
@@ -136,7 +130,14 @@ function FxExperiments({context}: {context: ExtensionContext}) {
             </Group>
           </Alert>
         )}
-        {!rows && !error && <Spinner />}
+        {!rows && !error && (
+          <Group gap="8">
+            <Spinner size="sm" />
+            <Text color="fg.secondary" fontSize="sm">
+              Reading every linked experiment…
+            </Text>
+          </Group>
+        )}
         {rows && rows.length === 0 && (
           <Alert intent="information">
             <Text fontSize="sm">
@@ -147,97 +148,136 @@ function FxExperiments({context}: {context: ExtensionContext}) {
         )}
 
         {rows && rows.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHeaderCell>Page</TableHeaderCell>
-                <TableHeaderCell>Route</TableHeaderCell>
-                <TableHeaderCell>Flag</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell>Split</TableHeaderCell>
-                <TableHeaderCell>Primary metric</TableHeaderCell>
-                <TableHeaderCell />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map(({link, rule, error: rowError}) => (
-                <TableRow key={rowKey(link)}>
-                  <TableCell>
-                    <Text fontSize="sm">{link.displayName}</Text>
-                    <Text color="fg.tertiary" fontSize="xs">{link.locale}</Text>
-                  </TableCell>
-                  <TableCell>
-                    <code>{rule?.route || link.route || '-'}</code>
-                  </TableCell>
-                  <TableCell>
-                    <code>{link.flagKey}</code>
-                    <Text color="fg.tertiary" fontSize="xs">{link.environmentKey}</Text>
-                  </TableCell>
-                  <TableCell>
-                    {link.conclusion ? (
-                      <Group flexDirection="column" gap="4">
-                        <Badge intent="information" variant="subtle">ended</Badge>
-                        <Text color="fg.secondary" fontSize="xs">{endedText(link)}</Text>
-                      </Group>
-                    ) : rule ? (
-                      <StatusBadge running={rule.running} status={rule.status} />
-                    ) : (
-                      <Text color="fg.error" fontSize="sm">{rowError}</Text>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {rule && (
-                      <Text fontSize="sm">
-                        {rule.variations.map((v) => `${v.key} ${formatPercent(v.percent)}`).join(' · ')}
-                        {rule.trafficPercent < 100 && (
-                          <Text asChild color="fg.secondary" fontSize="xs">
-                            <span> ({formatPercent(rule.trafficPercent)} traffic)</span>
-                          </Text>
-                        )}
-                      </Text>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Text fontSize="sm">{rule?.metrics[0]?.title ?? '-'}</Text>
-                    {rule && rule.metrics.length > 1 && (
-                      <Text color="fg.tertiary" fontSize="xs">+{rule.metrics.length - 1} more</Text>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Group gap="8">
-                      {rule && !link.conclusion && (
-                        <Button
-                          loading={busyRow === rowKey(link)}
-                          onClick={() => void setRunning(link, !rule.running)}
-                          size="sm"
-                        >
-                          {rule.running ? 'Pause' : 'Start'}
-                        </Button>
-                      )}
-                      {rule?.resultsUrl && <OpenLink url={rule.resultsUrl}>Results</OpenLink>}
-                      {rule && <OpenLink appearance="subtle" url={rule.flagUrl}>Flag</OpenLink>}
-                      {!rule && rowError && (
-                        <Button appearance="subtle" loading={busyRow === rowKey(link)} onClick={() => void forget(link)} size="sm">
-                          Remove
-                        </Button>
-                      )}
-                    </Group>
-                  </TableCell>
-                </TableRow>
+          <>
+            <div className="ui-grid" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))'}}>
+              {tiles.map((t) => (
+                <div className="ui-tile" key={t.label}>
+                  <div className="ui-tile-label">
+                    <span className="ui-chip" data-state={t.state} style={{padding: 2}}>
+                      <Icon name={t.icon} size={12} />
+                    </span>
+                    {t.label}
+                  </div>
+                  <div className="ui-tile-value">{t.n.toLocaleString('en-GB')}</div>
+                </div>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+
+            <div style={{overflowX: 'auto'}}>
+              <table className="ui-table">
+                <thead>
+                  <tr>
+                    <th>Page</th>
+                    <th>Flag and route</th>
+                    <th>Status</th>
+                    <th>Split</th>
+                    <th>Primary metric</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(({link, rule, error: rowError}) => (
+                    <tr key={rowKey(link)}>
+                      <td style={{minWidth: 150}}>
+                        <div style={{fontWeight: 500}}>{link.displayName}</div>
+                        <div className="ui-faint ui-small">{link.locale}</div>
+                      </td>
+                      <td style={{minWidth: 220}}>
+                        <Group alignItems="start" flexDirection="column" gap="4">
+                          <Code wrap>{link.flagKey}</Code>
+                          <span className="ui-faint ui-small">
+                            {link.environmentKey} · on {rule?.route || link.route || 'every page'}
+                          </span>
+                        </Group>
+                      </td>
+                      <td style={{minWidth: 150}}>
+                        {link.conclusion ? (
+                          <Group alignItems="start" flexDirection="column" gap="4">
+                            <Chip icon="check" label="Ended" state="draft" />
+                            <span className="ui-muted ui-small">{endedText(link)}</span>
+                          </Group>
+                        ) : rule ? (
+                          <StatusBadge running={rule.running} status={rule.status} />
+                        ) : (
+                          <Group alignItems="start" flexDirection="column" gap="4">
+                            <Chip label="Unavailable" state="bad" />
+                            <span className="ui-muted ui-small">{rowError}</span>
+                          </Group>
+                        )}
+                      </td>
+                      <td style={{minWidth: 170}}>
+                        {rule && (
+                          <Group alignItems="start" flexDirection="column" gap="2">
+                            {rule.variations.map((v) => (
+                              <span className="ui-small" key={v.key}>
+                                {v.key === 'control' ? 'Original page' : v.key}{' '}
+                                <span className="ui-faint ui-num">{formatPercent(v.percent)}</span>
+                              </span>
+                            ))}
+                            {rule.trafficPercent < 100 && (
+                              <span className="ui-faint ui-small">{formatPercent(rule.trafficPercent)} of visitors enter</span>
+                            )}
+                          </Group>
+                        )}
+                      </td>
+                      <td style={{minWidth: 140}}>
+                        <div>{rule?.metrics[0]?.title ?? '–'}</div>
+                        {rule && rule.metrics.length > 1 && (
+                          <div className="ui-faint ui-small">+{rule.metrics.length - 1} more</div>
+                        )}
+                      </td>
+                      <td>
+                        <Group gap="4" justifyContent="end" style={{flexWrap: 'nowrap'}}>
+                          {rule && !link.conclusion && (
+                            <Button
+                              loading={busyRow === rowKey(link)}
+                              onClick={() => void setRunning(link, !rule.running)}
+                              size="sm"
+                            >
+                              {rule.running ? 'Pause' : 'Start'}
+                            </Button>
+                          )}
+                          {rule?.resultsUrl && (
+                            <OpenLink appearance="subtle" size="sm" url={rule.resultsUrl}>
+                              Results
+                            </OpenLink>
+                          )}
+                          {rule && (
+                            <OpenLink appearance="subtle" size="sm" url={rule.flagUrl}>
+                              Flag
+                            </OpenLink>
+                          )}
+                          {!rule && rowError && (
+                            <Button appearance="subtle" loading={busyRow === rowKey(link)} onClick={() => void forget(link)} size="sm">
+                              Remove
+                            </Button>
+                          )}
+                        </Group>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {unlinked && unlinked.length > 0 && (
-          <Group flexDirection="column" gap="8">
-            <Heading level="4">CMS flags no page links to</Heading>
-            <Text color="fg.secondary" fontSize="sm">
-              These flags can serve CMS variations but aren&apos;t linked to a page here. Link one from a page&apos;s
-              Feature Experimentation panel to manage it from the editor.
-            </Text>
-            <Text fontSize="sm">{unlinked.map((f) => f.flagKey).join(', ')}</Text>
-          </Group>
+          <div className="ui-card">
+            <div className="ui-card-title">
+              <span>CMS flags no page links to</span>
+              <span className="ui-faint ui-small">{count(unlinked.length, 'flag')}</span>
+            </div>
+            <span className="ui-muted ui-small">
+              These flags can serve CMS variations but aren&apos;t linked to a page here. Link one from a page&apos;s Feature
+              Experimentation panel to manage it from the editor.
+            </span>
+            <div className="ui-chips">
+              {unlinked.map((f) => (
+                <Code key={f.flagKey}>{f.flagKey}</Code>
+              ))}
+            </div>
+          </div>
         )}
       </Group>
     </Box>

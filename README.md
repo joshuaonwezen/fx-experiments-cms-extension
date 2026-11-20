@@ -16,8 +16,8 @@ Documentation: [walkthrough](https://opti.joshuaonwezen.dev/demo/cms-ui-extensio
 - **Readiness checklist** before starting: the page and every variation in the test are published (Start is refused otherwise), a metric is set, the route covers the page's URLs (with a one-click fix), nothing else in FX changes the page (other experiments and targeted deliveries), and no variations from another tool are on the page.
 - **Once the test is linked:**
   - Start and pause. After starting, the panel checks the site's datafile until the test is live.
-  - **Results in the panel:** visitors, conversion rate and lift per variation for the primary metric, with significant lifts marked and a significant winner named. **Full results in FX** opens FX's own results page.
-  - A table of CMS variations and FX variations with **Preview** links on the live site, **Remove** per variation, and **Add to experiment** for new CMS variations. Adding keeps a custom split's proportions. On a running test both ask first.
+  - **Results in the panel:** visitors, conversion rate and lift per variation for the primary metric, with significant lifts marked and a significant winner named. **Full results in FX** links to FX's own results page.
+  - The variations, one row each: traffic share, whether the CMS has it published, **Preview** links on the live site, **Remove** per variation, and **Add to experiment** for new CMS variations. Adding keeps a custom split's proportions. On a running test both ask first.
   - Edit traffic, audiences, metrics (the first is primary; new events can be created inline) and the route.
 - **End experiment** shows the results and preselects a significant winner. Pick the winner (or no winner), then either:
   - **serve it to everyone from FX:** pauses the A/B rule and adds a targeted delivery of the winner, or
@@ -70,6 +70,7 @@ These come from the CMS UI extensions platform (beta, SDK 1.1.0) and the CMS API
 - **Extensions get no CMS token.** The app stores its own CMS API client in its settings.
 - **One FX project and environment per install**, the ones the saved SDK key belongs to.
 - **Preview links and suggested routes come from the page's public URL**, so the CMS application's host must be the site's address.
+- **Extensions can't open new tabs.** The CMS loads extensions in a sandboxed frame without `allow-popups`, so **Open flag in FX**, **Full results in FX**, **Preview** and the view's **Results** and **Flag** are real links that copy themselves on a plain click and say so; right-click › Open link in new tab opens them. Once the CMS allows popups, a plain click opens them.
 
 ## Security
 
